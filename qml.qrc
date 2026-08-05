@@ -1,0 +1,8 @@
+<RCC>
+    <qresource prefix="/qt/qml/AirTrafficManagement">
+        <file>presentation/Main.qml</file>
+        <file>presentation/RadarScope.qml</file>
+        <file>presentation/MultiStakeholderView.qml</file>
+        <file>presentation/FeaturePlaceholder.qml</file>
+    </qresource>
+</RCC>
