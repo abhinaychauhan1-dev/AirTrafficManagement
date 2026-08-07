@@ -22,8 +22,8 @@ public:
     virtual bool planMission(std::size_t index, const std::string &route, const std::string &profile) = 0;
     virtual bool bookMission(std::size_t index) = 0;
     virtual bool delayMission(std::size_t index) = 0;
-    virtual bool assignGate(std::size_t index) = 0;
-    virtual bool startCharging(std::size_t index) = 0;
+    virtual bool assignGate(std::size_t index, const std::string &callSign) = 0;
+    virtual bool startCharging(std::size_t index, const std::string &callSign) = 0;
     virtual bool decideSlot(std::size_t index, bool granted) = 0;
     virtual bool setBoundaryEnforcement(std::size_t index, bool enforced) = 0;
     virtual void advance() = 0;

@@ -65,6 +65,66 @@ Item {
         Text { text: value; color: root.textMain; font.family: "Consolas"; font.pixelSize: 14; font.bold: true }
     }
 
+    component StatusPill: Rectangle {
+        required property string label
+        property color accent: root.green
+        implicitWidth: pillContent.implicitWidth + 20
+        implicitHeight: 28
+        radius: 3
+        color: Qt.rgba(accent.r, accent.g, accent.b, 0.1)
+        border.color: Qt.rgba(accent.r, accent.g, accent.b, 0.6)
+
+        Row {
+            id: pillContent
+            anchors.centerIn: parent
+            spacing: 7
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 6
+                height: 6
+                radius: 3
+                color: accent
+            }
+            Text {
+                text: label
+                color: accent
+                font.family: "Consolas"
+                font.pixelSize: 11
+                font.bold: true
+            }
+        }
+    }
+
+    component KpiCard: Rectangle {
+        required property string label
+        required property string value
+        property string detail: ""
+        property color accent: root.cyan
+        implicitHeight: 64
+        color: "#0a1513"
+        border.color: root.line
+        radius: 3
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: 3
+            color: accent
+        }
+        Column {
+            anchors.left: parent.left
+            anchors.leftMargin: 12
+            anchors.right: parent.right
+            anchors.rightMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 2
+            Text { width: parent.width; text: label; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 10; font.bold: true }
+            Text { width: parent.width; text: value; color: accent; font.family: "Consolas"; font.pixelSize: 16; font.bold: true; elide: Text.ElideRight }
+            Text { width: parent.width; text: detail; visible: detail.length > 0; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 10; elide: Text.ElideRight }
+        }
+    }
+
     component TelemetryProgress: ColumnLayout {
         required property string label
         required property real value
@@ -169,60 +229,65 @@ Item {
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 90
+            Layout.preferredHeight: 108
             color: "#091412"
             border.color: root.line
             radius: 4
 
+            Rectangle {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: 4
+                color: root.green
+            }
+
             ColumnLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 14
-                anchors.rightMargin: 10
-                anchors.topMargin: 7
-                anchors.bottomMargin: 7
-                spacing: 5
+                anchors.leftMargin: 18
+                anchors.rightMargin: 12
+                anchors.topMargin: 10
+                anchors.bottomMargin: 9
+                spacing: 8
 
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 12
                     Column {
                         Layout.fillWidth: true
-                        spacing: 1
-                        Text { text: "ACTIVE TAXI MISSIONS"; color: root.textMain; font.family: "Consolas"; font.pixelSize: 16; font.bold: true }
-                        Text { text: root.selectedMissionData.callSign + "  /  " + root.selectedMissionData.route + "  /  " + root.selectedMissionData.status; visible: root.width >= 1180; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
+                        spacing: 2
+                        Text { text: "ACTIVE TAXI MISSIONS"; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 11; font.bold: true }
+                        Text { text: root.selectedMissionData.callSign || "NO ACTIVE MISSION"; color: root.textMain; font.family: "Consolas"; font.pixelSize: 22; font.bold: true }
                     }
-                    Rectangle {
-                        width: 7
-                        height: 7
-                        radius: 4
-                        color: root.viewModel.mqttConnected ? root.green : root.amber
-                        SequentialAnimation on opacity {
-                            running: root.viewModel.running || root.viewModel.mqttConnected
-                            loops: Animation.Infinite
-                            NumberAnimation { to: 0.25; duration: 650 }
-                            NumberAnimation { to: 1; duration: 650 }
-                        }
+                    StatusPill {
+                        label: String(root.selectedMissionData.status || "UNASSIGNED").toUpperCase()
+                        accent: root.selectedMissionData.severity === "warning" ? root.amber : root.green
+                    }
+                    StatusPill {
+                        label: root.viewModel.transportMode
+                        accent: root.viewModel.mqttConnected ? root.cyan : root.amber
                     }
                     Column {
-                        Layout.preferredWidth: root.width >= 950 ? 158 : 128
-                        Text { text: root.viewModel.transportMode; color: root.viewModel.mqttConnected ? root.green : root.amber; font.family: "Consolas"; font.pixelSize: 12; font.bold: true }
-                        Text { text: root.viewModel.transportStatusText; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 11; elide: Text.ElideRight; width: parent.width }
+                        Layout.preferredWidth: 112
+                        Text { width: parent.width; text: root.viewModel.simulationTime; color: root.textMain; font.family: "Consolas"; font.pixelSize: 20; font.bold: true; horizontalAlignment: Text.AlignRight }
+                        Text { width: parent.width; text: "INDIA STANDARD TIME"; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 9; horizontalAlignment: Text.AlignRight }
                     }
-                    Text { text: root.viewModel.simulationTime + " IST"; color: root.textMain; font.family: "Consolas"; font.pixelSize: 20; font.bold: true }
                 }
 
                 RowLayout {
                     Layout.fillWidth: true
                     Text {
                         Layout.fillWidth: true
-                        text: root.viewModel.mqttConnected ? "REMOTE EVENTS ONLY / LOCAL STATE LOCKED" : (root.viewModel.running ? "AUTO ADVANCE / 1 SIM MIN PER SECOND" : "PAUSED / MANUAL STEP READY")
-                        color: root.viewModel.mqttConnected ? root.cyan : root.textMuted
+                        text: (root.selectedMissionData.route || "ROUTE NOT ASSIGNED") + "  |  "
+                              + (root.viewModel.mqttConnected ? "REMOTE EVENTS / LOCAL STATE LOCKED" : (root.viewModel.running ? "LIVE SIMULATION" : "SIMULATION PAUSED"))
+                        color: root.viewModel.mqttConnected ? root.cyan : root.textMain
                         font.family: "Consolas"
-                        font.pixelSize: 11
+                        font.pixelSize: 12
+                        elide: Text.ElideRight
                     }
-                    ActionButton { Layout.preferredWidth: 76; text: root.viewModel.running ? "PAUSE" : "RESUME"; accent: root.amber; enabled: root.viewModel.localControlsEnabled; onClicked: root.viewModel.toggleRunning() }
-                    ActionButton { Layout.preferredWidth: 76; text: "STEP +1"; enabled: root.viewModel.manualStepEnabled; onClicked: root.viewModel.advanceSimulation() }
-                    ActionButton { Layout.preferredWidth: 68; text: "RESET"; accent: root.red; enabled: root.viewModel.localControlsEnabled; onClicked: root.viewModel.resetSimulation() }
+                    ActionButton { Layout.preferredWidth: 88; text: root.viewModel.running ? "PAUSE" : "RESUME"; accent: root.amber; enabled: root.viewModel.localControlsEnabled; onClicked: root.viewModel.toggleRunning() }
+                    ActionButton { Layout.preferredWidth: 88; text: "STEP +1"; enabled: root.viewModel.manualStepEnabled; onClicked: root.viewModel.advanceSimulation() }
+                    ActionButton { Layout.preferredWidth: 76; text: "RESET"; accent: root.red; enabled: root.viewModel.localControlsEnabled; onClicked: root.viewModel.resetSimulation() }
                 }
             }
         }
@@ -298,7 +363,39 @@ Item {
                     PanelTitle { title: "ACTIVE TAXI MISSION"; role: "CURRENT MISSION / DISPATCH" }
                     RowLayout {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 154
+                        spacing: 7
+                        KpiCard {
+                            Layout.fillWidth: true
+                            label: "DEPARTURE WINDOW"
+                            value: root.selectedMissionData.departure || "--:--"
+                            detail: "IST / ACTIVE SCHEDULE"
+                            accent: root.cyan
+                        }
+                        KpiCard {
+                            Layout.fillWidth: true
+                            label: "MISSION PROFILE"
+                            value: root.selectedMissionData.profile || "UNASSIGNED"
+                            detail: root.selectedMissionData.status || "NO STATUS"
+                            accent: root.green
+                        }
+                        KpiCard {
+                            Layout.fillWidth: true
+                            label: "VEHICLE HEALTH"
+                            value: Number(root.selectedMissionData.health || 0) + "%"
+                            detail: Number(root.selectedMissionData.health || 0) >= 60 ? "DISPATCH READY" : "INSPECTION REQUIRED"
+                            accent: Number(root.selectedMissionData.health || 0) >= 60 ? root.green : root.amber
+                        }
+                        KpiCard {
+                            Layout.fillWidth: true
+                            label: "UTM CLEARANCE"
+                            value: root.viewModel.activeMissionSlots.length > 0 ? root.viewModel.activeMissionSlots[0].status : "PENDING"
+                            detail: root.viewModel.activeMissionSlots.length > 0 ? root.viewModel.activeMissionSlots[0].corridor : "NO CORRIDOR"
+                            accent: value === "GRANTED" ? root.green : root.amber
+                        }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 166
                         spacing: 8
 
                         Rectangle {
@@ -407,72 +504,118 @@ Item {
                     }
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: 6
-                        InteractiveComboBox {
-                            id: routeSelector
+                        spacing: 8
+                        ColumnLayout {
                             Layout.fillWidth: true
-                            implicitHeight: 34
-                            model: root.viewModel.routeOptions
-                            font.pixelSize: 12
-                            enabled: root.viewModel.localControlsEnabled && root.viewModel.missions.length > 0
-                            palette.button: root.raised
-                            palette.buttonText: root.textMain
-                            palette.base: root.raised
-                            palette.text: root.textMain
-                            palette.highlight: "#17352d"
-                            palette.highlightedText: root.green
+                            spacing: 3
+                            Text { text: "ROUTE ASSIGNMENT"; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 10; font.bold: true }
+                            InteractiveComboBox {
+                                id: routeSelector
+                                Layout.fillWidth: true
+                                implicitHeight: 38
+                                model: root.viewModel.routeOptions
+                                font.pixelSize: 12
+                                enabled: root.viewModel.localControlsEnabled && root.viewModel.missions.length > 0
+                            }
                         }
-                        InteractiveComboBox {
-                            id: profileSelector
-                            Layout.preferredWidth: 110
-                            implicitHeight: 34
-                            model: root.viewModel.missionProfiles
-                            font.pixelSize: 12
-                            enabled: root.viewModel.localControlsEnabled && root.viewModel.missions.length > 0
-                            palette.button: root.raised
-                            palette.buttonText: root.textMain
-                            palette.base: root.raised
-                            palette.text: root.textMain
-                            palette.highlight: "#17352d"
-                            palette.highlightedText: root.green
+                        ColumnLayout {
+                            Layout.preferredWidth: 150
+                            spacing: 3
+                            Text { text: "FLIGHT PROFILE"; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 10; font.bold: true }
+                            InteractiveComboBox {
+                                id: profileSelector
+                                Layout.fillWidth: true
+                                implicitHeight: 38
+                                model: root.viewModel.missionProfiles
+                                font.pixelSize: 12
+                                enabled: root.viewModel.localControlsEnabled && root.viewModel.missions.length > 0
+                            }
                         }
-                        ActionButton { text: "PLAN ROUTE"; enabled: root.viewModel.localControlsEnabled && root.viewModel.missions.length > 0; onClicked: root.viewModel.planMission(root.selectedMission, routeSelector.currentText, profileSelector.currentText) }
+                        ActionButton { Layout.alignment: Qt.AlignBottom; Layout.preferredWidth: 122; implicitHeight: 38; text: "PLAN ROUTE"; enabled: root.viewModel.localControlsEnabled && root.viewModel.missions.length > 0; onClicked: root.viewModel.planMission(root.selectedMission, routeSelector.currentText, profileSelector.currentText) }
                     }
                     ListView {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        spacing: 3
+                        spacing: 5
                         clip: true
                         model: root.viewModel.missions
+                        boundsBehavior: Flickable.StopAtBounds
+                        ScrollIndicator.vertical: ScrollIndicator { }
                         Text { anchors.centerIn: parent; visible: parent.count === 0; text: "NO MISSIONS AVAILABLE"; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 12 }
                         delegate: Rectangle {
                             required property int index
                             required property var modelData
                             width: ListView.view.width
-                            height: 72
+                            height: 82
                             radius: 3
-                            color: index === root.selectedMission ? "#17352d" : root.raised
+                            color: index === root.selectedMission ? "#17352d" : (missionMouse.containsMouse ? "#132522" : root.raised)
                             border.color: modelData.severity === "warning" ? root.amber : (index === root.selectedMission ? root.green : root.line)
-                            scale: missionMouse.containsMouse ? 0.995 : 1
-                            Behavior on scale { NumberAnimation { duration: 120 } }
                             Behavior on color { ColorAnimation { duration: 180 } }
                             MouseArea { id: missionMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.viewModel.setActiveMissionIndex(index) }
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                width: index === root.selectedMission ? 4 : 2
+                                color: modelData.severity === "warning" ? root.amber : (index === root.selectedMission ? root.green : root.line)
+                                Behavior on width { NumberAnimation { duration: 140 } }
+                            }
                             RowLayout {
                                 anchors.fill: parent
-                                anchors.leftMargin: 8
-                                anchors.rightMargin: 8
-                                spacing: 10
+                                anchors.leftMargin: 14
+                                anchors.rightMargin: 12
+                                spacing: 14
                                 Column {
-                                    Layout.preferredWidth: 92
-                                    Text { text: modelData.callSign; color: root.textMain; font.family: "Consolas"; font.pixelSize: 16; font.bold: true }
-                                    Text { text: "DEPART " + modelData.departure; color: root.cyan; font.family: "Consolas"; font.pixelSize: 12 }
+                                    Layout.preferredWidth: 110
+                                    spacing: 3
+                                    Text { text: modelData.callSign; color: index === root.selectedMission ? root.green : root.textMain; font.family: "Consolas"; font.pixelSize: 17; font.bold: true }
+                                    Text { text: "DEPART  " + modelData.departure; color: root.cyan; font.family: "Consolas"; font.pixelSize: 11; font.bold: true }
                                 }
                                 Column {
                                     Layout.fillWidth: true
-                                    Text { text: modelData.route; color: root.textMain; font.pixelSize: 14; elide: Text.ElideRight; width: parent.width }
-                                    Text { text: modelData.profile + "  /  " + modelData.status; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 12 }
+                                    spacing: 4
+                                    Text { text: modelData.route; color: root.textMain; font.family: "Consolas"; font.pixelSize: 14; font.bold: true; elide: Text.ElideRight; width: parent.width }
+                                    Text { text: modelData.profile; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
                                 }
-                                Metric { Layout.preferredWidth: 70; label: "HEALTH"; value: modelData.health + "%" }
+                                Rectangle {
+                                    Layout.preferredWidth: statusText.implicitWidth + 16
+                                    Layout.preferredHeight: 26
+                                    radius: 3
+                                    color: modelData.severity === "warning" ? "#2b2015" : "#10261f"
+                                    border.color: modelData.severity === "warning" ? root.amber : root.green
+                                    Text {
+                                        id: statusText
+                                        anchors.centerIn: parent
+                                        text: modelData.status
+                                        color: modelData.severity === "warning" ? root.amber : root.green
+                                        font.family: "Consolas"
+                                        font.pixelSize: 10
+                                        font.bold: true
+                                    }
+                                }
+                                ColumnLayout {
+                                    Layout.preferredWidth: 104
+                                    spacing: 4
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text { text: "HEALTH"; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 10 }
+                                        Item { Layout.fillWidth: true }
+                                        Text { text: modelData.health + "%"; color: modelData.health < 60 ? root.amber : root.green; font.family: "Consolas"; font.pixelSize: 12; font.bold: true }
+                                    }
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        height: 5
+                                        radius: 2
+                                        color: "#1c2c29"
+                                        Rectangle {
+                                            width: parent.width * Math.max(0, Math.min(100, Number(modelData.health))) / 100
+                                            height: parent.height
+                                            radius: 2
+                                            color: modelData.health < 60 ? root.amber : root.green
+                                            Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -661,16 +804,18 @@ Item {
                 ColumnLayout {
                     Layout.preferredWidth: 220
                     Text { text: "CURRENT MISSION ACTIVITY"; color: root.textMain; font.family: "Consolas"; font.pixelSize: 13; font.bold: true }
-                    Text { text: root.selectedMissionData.callSign; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
+                    Text { text: root.selectedMissionData.callSign + "  /  " + root.viewModel.activeMissionActivity.length + " EVENTS"; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
                     Item { Layout.fillHeight: true }
                 }
                 Rectangle { width: 1; Layout.fillHeight: true; color: root.line }
                 ListView {
+                    id: missionActivityList
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     clip: true
                     spacing: 2
                     model: root.viewModel.activeMissionActivity
+                    onCountChanged: positionViewAtEnd()
                     Text { anchors.centerIn: parent; visible: parent.count === 0; text: "NO EVENTS RECEIVED"; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
                     delegate: Text {
                         required property string modelData

@@ -81,42 +81,41 @@ bool StakeholderSimulationComponent::delayMission(std::size_t index)
     return true;
 }
 
-bool StakeholderSimulationComponent::assignGate(std::size_t index)
+bool StakeholderSimulationComponent::assignGate(std::size_t index, const std::string &callSign)
 {
-    if (index >= m_vertiports.size())
+    if (index >= m_vertiports.size() || callSign.empty())
         return false;
     v1::Vertiport &vertiport = m_vertiports[index];
     if (vertiport.freeGates == 0) {
         vertiport.status = "GATE WAITLIST";
-        publish(v1::Stakeholder::VertiportOperator, vertiport.name + " gate request waitlisted");
+        updateMissionStatus(callSign, "GATE WAITLIST");
+        publish(v1::Stakeholder::VertiportOperator, callSign + " gate request waitlisted at " + vertiport.name);
     } else {
         --vertiport.freeGates;
         vertiport.passengerQueue = std::max(0, vertiport.passengerQueue - 8);
         vertiport.turnaroundMinutes = 18;
         vertiport.status = "TURNAROUND";
-        publish(v1::Stakeholder::VertiportOperator, vertiport.name + " assigned gate; loading started");
+        updateMissionStatus(callSign, "GATE ASSIGNED");
+        publish(v1::Stakeholder::VertiportOperator, callSign + " assigned gate at " + vertiport.name + "; loading started");
     }
     return true;
 }
 
-bool StakeholderSimulationComponent::startCharging(std::size_t index)
+bool StakeholderSimulationComponent::startCharging(std::size_t index, const std::string &callSign)
 {
-    if (index >= m_vertiports.size())
+    if (index >= m_vertiports.size() || callSign.empty())
         return false;
     v1::Vertiport &vertiport = m_vertiports[index];
     if (vertiport.freeChargers == 0) {
         vertiport.status = "CHARGER QUEUE";
-        publish(v1::Stakeholder::VertiportOperator, vertiport.name + " charger request queued");
+        updateMissionStatus(callSign, "CHARGER QUEUE");
+        publish(v1::Stakeholder::VertiportOperator, callSign + " charger request queued at " + vertiport.name);
     } else {
         --vertiport.freeChargers;
         vertiport.chargingMinutes = 10;
         vertiport.status = "CHARGING";
-        if (!m_missions.empty()) {
-            const auto mission = std::min_element(m_missions.begin(), m_missions.end(), [](const v1::Mission &left, const v1::Mission &right) {
-                return left.healthPercent < right.healthPercent;
-            });
-            vertiport.chargingCallSign = mission->callSign;
-        }
+        vertiport.chargingCallSign = callSign;
+        updateMissionStatus(callSign, "CHARGING");
         publish(v1::Stakeholder::VertiportOperator, vertiport.name + " charging "
             + vertiport.chargingCallSign + "; 10 min remaining");
     }

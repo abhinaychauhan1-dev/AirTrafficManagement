@@ -14,13 +14,9 @@ AppShellViewModel::AppShellViewModel(QObject *parent)
               {"description", "Current eVTOL missions with their assigned vertiports, UTM slots, and compliance status."},
               {"availability", "SIMULATION"}},
           QVariantMap{
-              {"label", "System Health & Power"},
-              {"description", "System performance, power status, and hardware health monitoring."},
-              {"availability", "PLANNED"},
-              {"featureNumber", "02"},
-              {"title", "BATTERY ENDURANCE & ALTERNATIVE LANDING LOCATION ENGINE"},
-              {"summary", "Will calculate mission energy reserves continuously and rank reachable alternative landing locations under operational constraints."},
-              {"capabilities", QStringList{"Energy reserve and degradation model", "Reachable ALL ranking", "Diversion recommendation workflow"}}},
+              {"label", "Hub & Ground Operations"},
+              {"description", "Live landing-pad, turnaround, queue, charging, and localized hub weather operations."},
+              {"availability", "LIVE"}},
           QVariantMap{
               {"label", "Performance Stress Test"},
               {"description", "High-density air-taxi demand scenarios that measure network limits and resilience."},

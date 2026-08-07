@@ -200,10 +200,28 @@ QVariantList QtStakeholderSimulationAdapter::activeMissionComplianceZones() cons
 QVariantList QtStakeholderSimulationAdapter::activeMissionActivity() const
 {
     QVariantList result;
-    const QString callSign = activeMission().value(QStringLiteral("callSign")).toString();
+    QStringList missionTokens;
+    missionTokens.append(activeMission().value(QStringLiteral("callSign")).toString());
+    for (const QVariant &entry : activeMissionVertiports())
+        missionTokens.append(entry.toMap().value(QStringLiteral("name")).toString());
+    for (const QVariant &entry : activeMissionSlots()) {
+        const QVariantMap slot = entry.toMap();
+        missionTokens.append(slot.value(QStringLiteral("requestId")).toString());
+        missionTokens.append(slot.value(QStringLiteral("corridor")).toString());
+    }
+    for (const QVariant &entry : activeMissionComplianceZones())
+        missionTokens.append(entry.toMap().value(QStringLiteral("name")).toString());
+    missionTokens.removeAll(QString());
+    missionTokens.removeDuplicates();
+
     for (const QVariant &entry : activityLog()) {
-        if (entry.toString().contains(callSign, Qt::CaseInsensitive))
-            result.append(entry);
+        const QString activity = entry.toString();
+        for (const QString &token : missionTokens) {
+            if (activity.contains(token, Qt::CaseInsensitive)) {
+                result.append(entry);
+                break;
+            }
+        }
     }
     return result;
 }
@@ -330,7 +348,8 @@ void QtStakeholderSimulationAdapter::assignGate(int index)
 {
     if (!actionAllowed(QStringLiteral("Assign gate")))
         return;
-    const bool success = index >= 0 && m_simulation.assignGate(static_cast<std::size_t>(index));
+    const std::string callSign = activeMission().value(QStringLiteral("callSign")).toString().toStdString();
+    const bool success = index >= 0 && m_simulation.assignGate(static_cast<std::size_t>(index), callSign);
     if (success)
         emitStateChanged();
     reportAction(success ? QStringLiteral("Gate request processed.") : QStringLiteral("Select a vertiport."), success);
@@ -340,7 +359,8 @@ void QtStakeholderSimulationAdapter::startCharging(int index)
 {
     if (!actionAllowed(QStringLiteral("Start charging")))
         return;
-    const bool success = index >= 0 && m_simulation.startCharging(static_cast<std::size_t>(index));
+    const std::string callSign = activeMission().value(QStringLiteral("callSign")).toString().toStdString();
+    const bool success = index >= 0 && m_simulation.startCharging(static_cast<std::size_t>(index), callSign);
     if (success)
         emitStateChanged();
     reportAction(success ? QStringLiteral("Charging request processed.") : QStringLiteral("Select a vertiport."), success);

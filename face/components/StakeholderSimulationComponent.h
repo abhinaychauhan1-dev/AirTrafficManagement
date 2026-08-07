@@ -22,8 +22,8 @@ public:
     bool planMission(std::size_t index, const std::string &route, const std::string &profile) override;
     bool bookMission(std::size_t index) override;
     bool delayMission(std::size_t index) override;
-    bool assignGate(std::size_t index) override;
-    bool startCharging(std::size_t index) override;
+    bool assignGate(std::size_t index, const std::string &callSign) override;
+    bool startCharging(std::size_t index, const std::string &callSign) override;
     bool decideSlot(std::size_t index, bool granted) override;
     bool setBoundaryEnforcement(std::size_t index, bool enforced) override;
     void advance() override;

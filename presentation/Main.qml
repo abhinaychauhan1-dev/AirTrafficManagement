@@ -762,14 +762,11 @@ ApplicationWindow {
         viewModel: stakeholderSimulationViewModel
     }
 
-    FeaturePlaceholder {
+    HubGroundOperationsView {
         anchors.fill: parent
         anchors.margins: 8
         visible: appShellViewModel.selectedModuleIndex === 2
-        featureNumber: appShellViewModel.modules[2].featureNumber
-        title: appShellViewModel.modules[2].title
-        summary: appShellViewModel.modules[2].summary
-        capabilities: appShellViewModel.modules[2].capabilities
+        viewModel: stakeholderSimulationViewModel
     }
 
     FeaturePlaceholder {

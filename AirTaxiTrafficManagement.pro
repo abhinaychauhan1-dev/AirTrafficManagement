@@ -41,6 +41,7 @@ QML_SOURCES += \
 	presentation/AirspaceManager.qml \
 	presentation/InteractiveComboBox.qml \
 	presentation/MultiStakeholderView.qml \
+	presentation/HubGroundOperationsView.qml \
 	presentation/FeaturePlaceholder.qml
 
 QML_FILES += $$QML_SOURCES

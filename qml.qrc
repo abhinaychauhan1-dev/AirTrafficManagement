@@ -6,6 +6,7 @@
         <file>presentation/AirspaceManager.qml</file>
         <file>presentation/InteractiveComboBox.qml</file>
         <file>presentation/MultiStakeholderView.qml</file>
+        <file>presentation/HubGroundOperationsView.qml</file>
         <file>presentation/FeaturePlaceholder.qml</file>
     </qresource>
 </RCC>
