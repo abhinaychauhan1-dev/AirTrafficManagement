@@ -11,21 +11,43 @@ Item {
     property int selectedTrack: 0
     property color phosphor: "#6fffc1"
     property color mutedPhosphor: "#3b9d7d"
+    property bool atMinimumRange: false
+    property bool atMaximumRange: false
+    property var boundaryPolyline
+    property var routeOverlays
+    property var weatherCells
+    property real viewCenterX: .5
+    property real viewCenterY: .51
+    readonly property real zoomScale: 80 / rangeNm
 
     signal trackSelected(int index)
-    signal rangeChangeRequested(int delta)
+    signal rangeStepRequested(int steps)
+    signal trackFocusRequested(int index)
 
     clip: true
 
+    function mapX(normalizedX) {
+        return width * 0.5 + (normalizedX - viewCenterX) * width * zoomScale
+    }
+
+    function mapY(normalizedY) {
+        return height * 0.51 + (normalizedY - viewCenterY) * height * zoomScale
+    }
+
     WheelHandler {
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-        onWheel: event => scope.rangeChangeRequested(event.angleDelta.y > 0 ? -20 : 20)
+        onWheel: event => scope.rangeStepRequested(event.angleDelta.y > 0 ? -1 : 1)
     }
 
     onRangeNmChanged: radarCanvas.requestPaint()
     onSweepEnabledChanged: radarCanvas.requestPaint()
     onWeatherEnabledChanged: radarCanvas.requestPaint()
     onRoutesEnabledChanged: radarCanvas.requestPaint()
+    onViewCenterXChanged: radarCanvas.requestPaint()
+    onViewCenterYChanged: radarCanvas.requestPaint()
+    onBoundaryPolylineChanged: radarCanvas.requestPaint()
+    onRouteOverlaysChanged: radarCanvas.requestPaint()
+    onWeatherCellsChanged: radarCanvas.requestPaint()
 
     Rectangle {
         anchors.fill: parent
@@ -61,6 +83,10 @@ Item {
                 ctx.beginPath()
                 ctx.arc(cx, cy, radius * ring / 4, 0, Math.PI * 2)
                 ctx.stroke()
+
+                ctx.fillStyle = "#587b71"
+                ctx.font = "9px Consolas"
+                ctx.fillText(Math.round(rangeNm * ring / 4), cx + 5, cy - radius * ring / 4 + 12)
             }
             for (let angle = 0; angle < Math.PI; angle += Math.PI / 6) {
                 ctx.beginPath()
@@ -69,18 +95,24 @@ Item {
                 ctx.stroke()
             }
 
-            ctx.fillStyle = "#6d9c8d"
-            ctx.font = "11px monospace"
-            ctx.fillText(rangeNm + " NM", cx + 8, cy - radius + 17)
+            ctx.fillStyle = "#7fa99d"
+            ctx.font = "11px Consolas"
             ctx.fillText("N", cx - 4, cy - radius - 8)
+
+            ctx.beginPath()
+            ctx.moveTo(cx, cy - radius - 4)
+            ctx.lineTo(cx - 4, cy - radius + 4)
+            ctx.lineTo(cx + 4, cy - radius + 4)
+            ctx.closePath()
+            ctx.fillStyle = phosphor
+            ctx.fill()
 
             ctx.strokeStyle = "#406d5d"
             ctx.lineWidth = 1.5
-            const boundary = [[.08,.60],[.17,.48],[.28,.43],[.38,.28],[.52,.31],[.64,.19],[.76,.30],[.88,.25]]
             ctx.beginPath()
-            boundary.forEach((point, index) => {
-                const px = point[0] * w
-                const py = point[1] * h
+            boundaryPolyline.forEach((point, index) => {
+                const px = scope.mapX(point.x)
+                const py = scope.mapY(point.y)
                 if (index === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py)
             })
             ctx.stroke()
@@ -88,28 +120,22 @@ Item {
             if (routesEnabled) {
                 ctx.setLineDash([7, 7])
                 ctx.strokeStyle = "#315f52"
-                const routes = [
-                    [[.08,.82],[.32,.58],[.53,.48],[.93,.24]],
-                    [[.12,.20],[.34,.38],[.56,.51],[.90,.76]],
-                    [[.31,.93],[.43,.64],[.52,.51],[.65,.10]]
-                ]
-                routes.forEach(route => {
+                routeOverlays.forEach(route => {
                     ctx.beginPath()
                     route.forEach((point, index) => index === 0
-                        ? ctx.moveTo(point[0] * w, point[1] * h)
-                        : ctx.lineTo(point[0] * w, point[1] * h))
+                        ? ctx.moveTo(scope.mapX(point.x), scope.mapY(point.y))
+                        : ctx.lineTo(scope.mapX(point.x), scope.mapY(point.y)))
                     ctx.stroke()
                 })
                 ctx.setLineDash([])
             }
 
             if (weatherEnabled) {
-                const cells = [[.28,.66,.10,"#385f31"],[.30,.65,.065,"#7f7b25"],[.74,.33,.09,"#305b38"],[.76,.34,.045,"#976f22"]]
-                cells.forEach(cell => {
+                weatherCells.forEach(cell => {
                     ctx.globalAlpha = 0.58
-                    ctx.fillStyle = cell[3]
+                    ctx.fillStyle = cell.color
                     ctx.beginPath()
-                    ctx.arc(cell[0] * w, cell[1] * h, cell[2] * radius, 0, Math.PI * 2)
+                    ctx.arc(scope.mapX(cell.x), scope.mapY(cell.y), cell.radius * radius * scope.zoomScale, 0, Math.PI * 2)
                     ctx.fill()
                 })
                 ctx.globalAlpha = 1
@@ -154,13 +180,30 @@ Item {
             required property string callSign
             required property string level
             required property int speed
+            required property int heading
+            required property int verticalRate
             required property real positionX
             required property real positionY
             required property bool alert
-            x: positionX * scope.width - 7
-            y: positionY * scope.height - 7
+            x: scope.mapX(positionX) - 7
+            y: scope.mapY(positionY) - 7
             width: 122
             height: 52
+            scale: markerHover.hovered || index === scope.selectedTrack ? 1.04 : 1
+            z: index === scope.selectedTrack ? 3 : (markerHover.hovered ? 2 : 1)
+
+            Behavior on scale { NumberAnimation { duration: 100 } }
+
+            Rectangle {
+                x: 6
+                y: -22
+                width: 1
+                height: 28
+                rotation: trackMarker.heading
+                transformOrigin: Item.Bottom
+                color: trackMarker.alert ? "#ffb443" : scope.mutedPhosphor
+                opacity: markerHover.hovered || trackMarker.index === scope.selectedTrack ? 0.9 : 0.55
+            }
 
             Rectangle {
                 x: 2
@@ -191,22 +234,23 @@ Item {
                 Text {
                     anchors.fill: parent
                     anchors.margins: 4
-                    text: trackMarker.callSign + "  " + trackMarker.level + "\n" + trackMarker.speed + "KT  -0"
+                    text: trackMarker.callSign + "  " + trackMarker.level + "\n" + trackMarker.speed + "KT  " + (trackMarker.verticalRate > 0 ? "+" : "") + trackMarker.verticalRate
                     color: trackMarker.alert ? "#ffcc75" : (trackMarker.index === scope.selectedTrack ? "#ffffff" : scope.phosphor)
                     font.family: "Consolas"
                     font.pixelSize: 10
                     lineHeight: 0.9
                 }
             }
+            HoverHandler {
+                id: markerHover
+                cursorShape: Qt.PointingHandCursor
+            }
             MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
                 hoverEnabled: true
                 onClicked: scope.trackSelected(trackMarker.index)
-                onDoubleClicked: {
-                    scope.trackSelected(trackMarker.index)
-                    scope.rangeChangeRequested(-20)
-                }
+                onDoubleClicked: scope.trackFocusRequested(trackMarker.index)
             }
         }
     }
@@ -218,5 +262,25 @@ Item {
         radius: 4
         color: scope.phosphor
         border.color: "#d6fff0"
+    }
+
+    Rectangle {
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 14
+        width: 152
+        height: 30
+        color: "#d00a1714"
+        border.color: "#2b4b43"
+        radius: 3
+
+        Text {
+            anchors.centerIn: parent
+            text: scope.rangeNm + " NM  •  SCROLL TO RANGE"
+            color: (scope.atMinimumRange || scope.atMaximumRange) ? "#ffb443" : "#7f9690"
+            font.family: "Consolas"
+            font.pixelSize: 9
+            font.bold: scope.atMinimumRange || scope.atMaximumRange
+        }
     }
 }

@@ -109,12 +109,16 @@ bool StakeholderSimulationComponent::startCharging(std::size_t index)
         publish(v1::Stakeholder::VertiportOperator, vertiport.name + " charger request queued");
     } else {
         --vertiport.freeChargers;
+        vertiport.chargingMinutes = 10;
         vertiport.status = "CHARGING";
         if (!m_missions.empty()) {
-            v1::Mission &mission = m_missions[index % m_missions.size()];
-            mission.healthPercent = std::min(100, mission.healthPercent + 15);
+            const auto mission = std::min_element(m_missions.begin(), m_missions.end(), [](const v1::Mission &left, const v1::Mission &right) {
+                return left.healthPercent < right.healthPercent;
+            });
+            vertiport.chargingCallSign = mission->callSign;
         }
-        publish(v1::Stakeholder::VertiportOperator, vertiport.name + " charging cycle started");
+        publish(v1::Stakeholder::VertiportOperator, vertiport.name + " charging "
+            + vertiport.chargingCallSign + "; 10 min remaining");
     }
     return true;
 }
@@ -145,6 +149,13 @@ bool StakeholderSimulationComponent::setBoundaryEnforcement(std::size_t index, b
                 updateMissionStatus(slot.callSign, "COMPLIANCE HOLD");
             }
         }
+    } else if (!enforced) {
+        for (v1::SlotRequest &slot : m_slotRequests) {
+            if (slot.status == "HELD - NOISE") {
+                slot.status = "REVIEW";
+                updateMissionStatus(slot.callSign, "SLOT REVIEW");
+            }
+        }
     }
     publish(v1::Stakeholder::UrbanAuthority, zone.name + (enforced
         ? " compliance boundary enforced" : " switched to monitor only"));
@@ -155,12 +166,28 @@ void StakeholderSimulationComponent::advance()
 {
     m_minutes = (m_minutes + 1) % (24 * 60);
     for (v1::Vertiport &vertiport : m_vertiports) {
-        if (vertiport.turnaroundMinutes == 0)
-            continue;
-        --vertiport.turnaroundMinutes;
-        if (vertiport.turnaroundMinutes == 0) {
+        if (vertiport.turnaroundMinutes > 0)
+            --vertiport.turnaroundMinutes;
+        if (vertiport.turnaroundMinutes == 0 && vertiport.freeGates < vertiport.gates) {
             vertiport.freeGates = std::min(vertiport.gates, vertiport.freeGates + 1);
-            vertiport.status = "AVAILABLE";
+            if (vertiport.chargingMinutes == 0)
+                vertiport.status = "AVAILABLE";
+        }
+
+        if (vertiport.chargingMinutes > 0)
+            --vertiport.chargingMinutes;
+        if (vertiport.chargingMinutes == 0 && !vertiport.chargingCallSign.empty()) {
+            const auto mission = std::find_if(m_missions.begin(), m_missions.end(), [&](const v1::Mission &candidate) {
+                return candidate.callSign == vertiport.chargingCallSign;
+            });
+            if (mission != m_missions.end()) {
+                mission->healthPercent = std::min(100, mission->healthPercent + 20);
+                mission->status = mission->healthPercent < 60 ? "HEALTH REVIEW" : "READY";
+            }
+            vertiport.freeChargers = std::min(vertiport.chargers, vertiport.freeChargers + 1);
+            publish(v1::Stakeholder::VertiportOperator, vertiport.name + " charging complete for " + vertiport.chargingCallSign);
+            vertiport.chargingCallSign.clear();
+            vertiport.status = vertiport.turnaroundMinutes > 0 ? "TURNAROUND" : "AVAILABLE";
         }
     }
 }
@@ -174,9 +201,9 @@ void StakeholderSimulationComponent::reset()
         {"URB308", "Gurugram - IGI", "AIRPORT", "08:32", 73, "PLANNED"}
     };
     m_vertiports = {
-        {"VPT-IGI", 6, 2, 4, 1, 34, 12, "BUSY"},
-        {"VPT-NOIDA", 4, 1, 3, 2, 18, 7, "AVAILABLE"},
-        {"VPT-GGM", 5, 0, 3, 1, 27, 16, "SATURATED"}
+        {"VPT-IGI", 6, 2, 4, 1, 34, 12, "BUSY", 0, ""},
+        {"VPT-NOIDA", 4, 1, 3, 2, 18, 7, "AVAILABLE", 0, ""},
+        {"VPT-GGM", 5, 0, 3, 1, 27, 16, "SATURATED", 0, ""}
     };
     m_slotRequests = {
         {"SL-1042", "ATX201", "C-DELTA", "08:20", "PENDING"},

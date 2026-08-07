@@ -11,10 +11,12 @@ class MultiStakeholderViewModelTest final : public QObject
 private slots:
     void bookingRespectsFleetHealth();
     void slotDecisionPropagatesToMission();
-    void vertiportActionsConsumeResources();
+    void vertiportResourcesCompleteTheirLifecycle();
     void complianceCapHoldsPendingOperations();
     void manualStepWorksWhilePaused();
     void mqttConnectionControlsSimulationFallback();
+    void mqttEventFeedRejectsLocalMutations();
+    void invalidActionsProvideFeedback();
     void eventsUseVersionedMonotonicContract();
 };
 
@@ -52,7 +54,7 @@ void MultiStakeholderViewModelTest::slotDecisionPropagatesToMission()
     QCOMPARE(viewModel.missions().at(2).toMap().value("status").toString(), QString("SLOT DENIED"));
 }
 
-void MultiStakeholderViewModelTest::vertiportActionsConsumeResources()
+void MultiStakeholderViewModelTest::vertiportResourcesCompleteTheirLifecycle()
 {
     SimulationFixture fixture;
     QtStakeholderSimulationAdapter &viewModel = fixture.viewModel;
@@ -65,7 +67,16 @@ void MultiStakeholderViewModelTest::vertiportActionsConsumeResources()
 
     viewModel.startCharging(1);
     QCOMPARE(viewModel.vertiports().at(1).toMap().value("freeChargers").toInt(), 1);
-    QCOMPARE(viewModel.missions().at(1).toMap().value("health").toInt(), 69);
+    QCOMPARE(viewModel.vertiports().at(1).toMap().value("chargingMinutes").toInt(), 10);
+    QCOMPARE(viewModel.missions().at(1).toMap().value("health").toInt(), 54);
+
+    for (int minute = 0; minute < 10; ++minute)
+        viewModel.advanceSimulation();
+
+    QCOMPARE(viewModel.vertiports().at(1).toMap().value("freeChargers").toInt(), 2);
+    QCOMPARE(viewModel.vertiports().at(1).toMap().value("chargingMinutes").toInt(), 0);
+    QCOMPARE(viewModel.missions().at(1).toMap().value("health").toInt(), 74);
+    QCOMPARE(viewModel.missions().at(1).toMap().value("status").toString(), QString("READY"));
 }
 
 void MultiStakeholderViewModelTest::complianceCapHoldsPendingOperations()
@@ -78,6 +89,10 @@ void MultiStakeholderViewModelTest::complianceCapHoldsPendingOperations()
     QCOMPARE(viewModel.slotRequests().at(0).toMap().value("status").toString(), QString("HELD - NOISE"));
     QCOMPARE(viewModel.slotRequests().at(1).toMap().value("status").toString(), QString("HELD - NOISE"));
     QCOMPARE(viewModel.missions().at(0).toMap().value("status").toString(), QString("COMPLIANCE HOLD"));
+
+    viewModel.setBoundaryEnforcement(1, false);
+    QCOMPARE(viewModel.slotRequests().at(0).toMap().value("status").toString(), QString("REVIEW"));
+    QCOMPARE(viewModel.missions().at(0).toMap().value("status").toString(), QString("SLOT REVIEW"));
 }
 
 void MultiStakeholderViewModelTest::manualStepWorksWhilePaused()
@@ -101,11 +116,39 @@ void MultiStakeholderViewModelTest::mqttConnectionControlsSimulationFallback()
     const QString liveTime = viewModel.simulationTime();
     QTest::qWait(1200);
     QCOMPARE(viewModel.simulationTime(), liveTime);
-    QCOMPARE(viewModel.transportMode(), QString("MQTT LIVE"));
+    QCOMPARE(viewModel.transportMode(), QString("MQTT EVENT FEED"));
+    QVERIFY(!viewModel.localControlsEnabled());
+    QVERIFY(!viewModel.manualStepEnabled());
 
     viewModel.setMqttConnected(false);
     QTRY_VERIFY_WITH_TIMEOUT(viewModel.simulationTime() != liveTime, 1500);
-    QCOMPARE(viewModel.transportMode(), QString("BUILT-IN SIMULATION"));
+    QCOMPARE(viewModel.transportMode(), QString("LOCAL SIMULATION"));
+    QVERIFY(viewModel.localControlsEnabled());
+}
+
+void MultiStakeholderViewModelTest::mqttEventFeedRejectsLocalMutations()
+{
+    SimulationFixture fixture;
+    QtStakeholderSimulationAdapter &viewModel = fixture.viewModel;
+    viewModel.setMqttConnected(true);
+
+    const QString initialTime = viewModel.simulationTime();
+    viewModel.advanceSimulation();
+    QCOMPARE(viewModel.simulationTime(), initialTime);
+    QCOMPARE(viewModel.actionSeverity(), QString("warning"));
+    QVERIFY(viewModel.actionMessage().contains(QString("unavailable")));
+
+    viewModel.resetSimulation();
+    QCOMPARE(viewModel.simulationTime(), initialTime);
+}
+
+void MultiStakeholderViewModelTest::invalidActionsProvideFeedback()
+{
+    SimulationFixture fixture;
+    fixture.viewModel.bookMission(-1);
+
+    QCOMPARE(fixture.viewModel.actionSeverity(), QString("warning"));
+    QCOMPARE(fixture.viewModel.actionMessage(), QString("Select a mission to book."));
 }
 
 void MultiStakeholderViewModelTest::eventsUseVersionedMonotonicContract()

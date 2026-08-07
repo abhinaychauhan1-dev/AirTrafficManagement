@@ -4,6 +4,7 @@
 #include "face/interfaces/IStakeholderSimulation.h"
 
 #include <QObject>
+#include <QStringList>
 #include <QTimer>
 #include <QVariantList>
 
@@ -20,6 +21,15 @@ class QtStakeholderSimulationAdapter final : public QObject
     Q_PROPERTY(bool mqttConnected READ mqttConnected NOTIFY transportChanged)
     Q_PROPERTY(QString transportMode READ transportMode NOTIFY transportChanged)
     Q_PROPERTY(QString brokerDescription READ brokerDescription NOTIFY transportChanged)
+    Q_PROPERTY(QString transportStatusText READ transportStatusText NOTIFY transportChanged)
+    Q_PROPERTY(QStringList stakeholderTabs READ stakeholderTabs CONSTANT)
+    Q_PROPERTY(QStringList routeOptions READ routeOptions CONSTANT)
+    Q_PROPERTY(QStringList missionProfiles READ missionProfiles CONSTANT)
+    Q_PROPERTY(QVariantMap workflowNotes READ workflowNotes CONSTANT)
+    Q_PROPERTY(bool localControlsEnabled READ localControlsEnabled NOTIFY transportChanged)
+    Q_PROPERTY(bool manualStepEnabled READ manualStepEnabled NOTIFY controlStateChanged)
+    Q_PROPERTY(QString actionMessage READ actionMessage NOTIFY actionFeedbackChanged)
+    Q_PROPERTY(QString actionSeverity READ actionSeverity NOTIFY actionFeedbackChanged)
 
 public:
     QtStakeholderSimulationAdapter(atm::face::interfaces::IStakeholderSimulation &simulation,
@@ -37,6 +47,15 @@ public:
     bool mqttConnected() const;
     QString transportMode() const;
     QString brokerDescription() const;
+    QString transportStatusText() const;
+    QStringList stakeholderTabs() const;
+    QStringList routeOptions() const;
+    QStringList missionProfiles() const;
+    QVariantMap workflowNotes() const;
+    bool localControlsEnabled() const;
+    bool manualStepEnabled() const;
+    QString actionMessage() const;
+    QString actionSeverity() const;
     void setBrokerDescription(const QString &description);
 
 public slots:
@@ -51,6 +70,7 @@ public slots:
     Q_INVOKABLE void setBoundaryEnforcement(int index, bool enforced);
     Q_INVOKABLE void advanceSimulation();
     Q_INVOKABLE void resetSimulation();
+    Q_INVOKABLE void toggleRunning();
 
 signals:
     void missionsChanged();
@@ -61,14 +81,20 @@ signals:
     void simulationTimeChanged();
     void runningChanged();
     void transportChanged();
+    void controlStateChanged();
+    void actionFeedbackChanged();
 
 private:
+    bool actionAllowed(const QString &action);
+    void reportAction(const QString &message, bool success);
     void emitStateChanged();
 
     atm::face::interfaces::IStakeholderSimulation &m_simulation;
     atm::face::interfaces::IEventTransport &m_transport;
     QTimer m_timer;
     QString m_brokerDescription;
+    QString m_actionMessage;
+    QString m_actionSeverity = QStringLiteral("info");
     bool m_running = true;
     bool m_mqttConnected = false;
 };

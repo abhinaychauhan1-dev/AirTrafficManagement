@@ -1,6 +1,6 @@
-# Air Traffic Management (ATM) System
+# Air Taxi Traffic Management (ATTM) System
 
-A desktop-based Air Traffic Management and simulation application built using **C++** and the **Qt framework**. This project is designed to model, monitor, and simulate air traffic control operations, tracking trajectories, and airspace management workflows.
+A desktop-based Air Taxi Traffic Management and simulation application built using **C++** and the **Qt framework**. This project is designed to model, monitor, and simulate urban air mobility (UAM) operations, tracking trajectories, and airspace management workflows.
 
 ---
 
@@ -22,9 +22,8 @@ A desktop-based Air Traffic Management and simulation application built using **
 ---
 
 ## 📂 Project Structure
-
 ```text
-AirTrafficManagement/
+AirTaxiTrafficManagement/
 │
 ├── 📁 src/                 # Source files (.cpp, .h)
 │   ├── 📁 ui/              # User interface components and windows
@@ -33,5 +32,5 @@ AirTrafficManagement/
 │
 ├── 📁 resources/           # Icons, maps, configuration files, and assets
 ├── 📁 tests/               # Unit and integration tests
-├── CMakeLists.txt          # CMake configuration file (or AirTrafficManagement.pro)
+├── CMakeLists.txt          # CMake configuration file (or AirTaxiTrafficManagement.pro)
 └── README.md               # Project documentation

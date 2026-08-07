@@ -21,7 +21,10 @@ public:
         PositionYRole,
         AlertRole,
         HeadingRole,
-        AircraftTypeRole
+        AircraftTypeRole,
+        VerticalRateRole,
+        StatusLabelRole,
+        SeverityRole
     };
     Q_ENUM(Role)
 
@@ -31,7 +34,9 @@ public:
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
     QVariantMap flightAt(int row) const;
+    QVariantMap alertFlight() const;
     int alertCount() const;
+    bool advanceOneSecond(int tick);
 
 private:
     struct Flight {
@@ -47,6 +52,7 @@ private:
         bool alert;
         int heading;
         QString aircraftType;
+        int verticalRate;
     };
 
     QList<Flight> m_flights;

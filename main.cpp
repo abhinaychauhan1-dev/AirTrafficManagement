@@ -5,6 +5,7 @@
 #include "adapters/MqttEventTransport.h"
 #include "adapters/QtStakeholderSimulationAdapter.h"
 #include "face/components/StakeholderSimulationComponent.h"
+#include "viewmodels/AppShellViewModel.h"
 #include "viewmodels/AirTrafficViewModel.h"
 
 int main(int argc, char *argv[])
@@ -14,6 +15,7 @@ int main(int argc, char *argv[])
     QGuiApplication::setOrganizationName(QStringLiteral("ATM Systems"));
 
     AirTrafficViewModel viewModel;
+    AppShellViewModel shellViewModel;
     MqttEventTransport eventTransport;
     atm::face::components::StakeholderSimulationComponent stakeholderSimulation(eventTransport);
     QtStakeholderSimulationAdapter stakeholderViewModel(stakeholderSimulation, eventTransport);
@@ -24,6 +26,7 @@ int main(int argc, char *argv[])
                      &stakeholderViewModel, &QtStakeholderSimulationAdapter::activityLogChanged);
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("airTrafficViewModel"), &viewModel);
+    engine.rootContext()->setContextProperty(QStringLiteral("appShellViewModel"), &shellViewModel);
     engine.rootContext()->setContextProperty(QStringLiteral("stakeholderSimulationViewModel"), &stakeholderViewModel);
     QObject::connect(
         &engine,

@@ -40,13 +40,16 @@ QVariantList QtStakeholderSimulationAdapter::missions() const
 {
     QVariantList result;
     for (const atm::face::v1::Mission &mission : m_simulation.missions()) {
+        const bool canBook = mission.healthPercent >= 60;
         result.append(QVariantMap{
             {QStringLiteral("callSign"), QString::fromStdString(mission.callSign)},
             {QStringLiteral("route"), QString::fromStdString(mission.route)},
             {QStringLiteral("profile"), QString::fromStdString(mission.profile)},
             {QStringLiteral("departure"), QString::fromStdString(mission.departure)},
             {QStringLiteral("health"), mission.healthPercent},
-            {QStringLiteral("status"), QString::fromStdString(mission.status)}
+            {QStringLiteral("status"), QString::fromStdString(mission.status)},
+            {QStringLiteral("canBook"), canBook},
+            {QStringLiteral("severity"), canBook ? QStringLiteral("normal") : QStringLiteral("warning")}
         });
     }
     return result;
@@ -56,6 +59,7 @@ QVariantList QtStakeholderSimulationAdapter::vertiports() const
 {
     QVariantList result;
     for (const atm::face::v1::Vertiport &vertiport : m_simulation.vertiports()) {
+        const bool saturated = vertiport.freeGates == 0;
         result.append(QVariantMap{
             {QStringLiteral("name"), QString::fromStdString(vertiport.name)},
             {QStringLiteral("gates"), vertiport.gates},
@@ -64,7 +68,11 @@ QVariantList QtStakeholderSimulationAdapter::vertiports() const
             {QStringLiteral("freeChargers"), vertiport.freeChargers},
             {QStringLiteral("queue"), vertiport.passengerQueue},
             {QStringLiteral("turnaround"), vertiport.turnaroundMinutes},
-            {QStringLiteral("status"), QString::fromStdString(vertiport.status)}
+            {QStringLiteral("chargingMinutes"), vertiport.chargingMinutes},
+            {QStringLiteral("chargingCallSign"), QString::fromStdString(vertiport.chargingCallSign)},
+            {QStringLiteral("status"), QString::fromStdString(vertiport.status)},
+            {QStringLiteral("saturated"), saturated},
+            {QStringLiteral("severity"), saturated ? QStringLiteral("warning") : QStringLiteral("normal")}
         });
     }
     return result;
@@ -74,12 +82,15 @@ QVariantList QtStakeholderSimulationAdapter::slotRequests() const
 {
     QVariantList result;
     for (const atm::face::v1::SlotRequest &slot : m_simulation.slotRequests()) {
+        const QString status = QString::fromStdString(slot.status);
+        const bool adverse = status == QStringLiteral("DENIED") || status == QStringLiteral("HELD - NOISE");
         result.append(QVariantMap{
             {QStringLiteral("requestId"), QString::fromStdString(slot.requestId)},
             {QStringLiteral("callSign"), QString::fromStdString(slot.callSign)},
             {QStringLiteral("corridor"), QString::fromStdString(slot.corridor)},
             {QStringLiteral("desired"), QString::fromStdString(slot.desiredTime)},
-            {QStringLiteral("status"), QString::fromStdString(slot.status)}
+            {QStringLiteral("status"), status},
+            {QStringLiteral("severity"), adverse ? QStringLiteral("warning") : QStringLiteral("normal")}
         });
     }
     return result;
@@ -89,6 +100,7 @@ QVariantList QtStakeholderSimulationAdapter::complianceZones() const
 {
     QVariantList result;
     for (const atm::face::v1::ComplianceZone &zone : m_simulation.complianceZones()) {
+        const bool capExceeded = zone.currentOverflights >= zone.overflightCap;
         result.append(QVariantMap{
             {QStringLiteral("name"), QString::fromStdString(zone.name)},
             {QStringLiteral("track"), QString::fromStdString(zone.track)},
@@ -96,7 +108,9 @@ QVariantList QtStakeholderSimulationAdapter::complianceZones() const
             {QStringLiteral("current"), zone.currentOverflights},
             {QStringLiteral("noise"), zone.noiseDba},
             {QStringLiteral("enforced"), zone.enforced},
-            {QStringLiteral("status"), QString::fromStdString(zone.status)}
+            {QStringLiteral("status"), QString::fromStdString(zone.status)},
+            {QStringLiteral("capExceeded"), capExceeded},
+            {QStringLiteral("severity"), capExceeded ? QStringLiteral("warning") : QStringLiteral("normal")}
         });
     }
     return result;
@@ -127,10 +141,51 @@ bool QtStakeholderSimulationAdapter::mqttConnected() const { return m_mqttConnec
 
 QString QtStakeholderSimulationAdapter::transportMode() const
 {
-    return m_mqttConnected ? QStringLiteral("MQTT LIVE") : QStringLiteral("BUILT-IN SIMULATION");
+    return m_mqttConnected ? QStringLiteral("MQTT EVENT FEED") : QStringLiteral("LOCAL SIMULATION");
 }
 
 QString QtStakeholderSimulationAdapter::brokerDescription() const { return m_brokerDescription; }
+
+QString QtStakeholderSimulationAdapter::transportStatusText() const
+{
+    return m_mqttConnected ? m_brokerDescription : QStringLiteral("MQTT OFFLINE");
+}
+
+QStringList QtStakeholderSimulationAdapter::stakeholderTabs() const
+{
+    return {QStringLiteral("FLEET OPERATIONS"), QStringLiteral("VERTIPORT"),
+            QStringLiteral("ANSP / PSU"), QStringLiteral("URBAN AUTHORITY")};
+}
+
+QStringList QtStakeholderSimulationAdapter::routeOptions() const
+{
+    return {QStringLiteral("Dilli Haat - IGI"), QStringLiteral("Noida - Connaught Place"),
+            QStringLiteral("Gurugram - IGI"), QStringLiteral("Rohini - Aerocity")};
+}
+
+QStringList QtStakeholderSimulationAdapter::missionProfiles() const
+{
+    return {QStringLiteral("COMMUTER"), QStringLiteral("AIRPORT"),
+            QStringLiteral("CARGO"), QStringLiteral("MEDEVAC")};
+}
+
+QVariantMap QtStakeholderSimulationAdapter::workflowNotes() const
+{
+    return {
+        {"booking", "Health below 60% blocks booking"},
+        {"vertiport", "Resources update in shared time"},
+        {"slot", "Decisions propagate to fleet status"},
+        {"compliance", "Cap enforcement holds pending slots"}
+    };
+}
+
+bool QtStakeholderSimulationAdapter::localControlsEnabled() const { return !m_mqttConnected; }
+
+bool QtStakeholderSimulationAdapter::manualStepEnabled() const { return !m_running && localControlsEnabled(); }
+
+QString QtStakeholderSimulationAdapter::actionMessage() const { return m_actionMessage; }
+
+QString QtStakeholderSimulationAdapter::actionSeverity() const { return m_actionSeverity; }
 
 void QtStakeholderSimulationAdapter::setBrokerDescription(const QString &description)
 {
@@ -146,6 +201,10 @@ void QtStakeholderSimulationAdapter::setMqttConnected(bool connected)
         return;
     m_mqttConnected = connected;
     emit transportChanged();
+    emit controlStateChanged();
+    reportAction(connected
+        ? QStringLiteral("MQTT event feed connected. Local simulation controls are read-only.")
+        : QStringLiteral("MQTT unavailable. Local simulation controls restored."), true);
 }
 
 void QtStakeholderSimulationAdapter::setRunning(bool running)
@@ -154,63 +213,114 @@ void QtStakeholderSimulationAdapter::setRunning(bool running)
         return;
     m_running = running;
     emit runningChanged();
+    emit controlStateChanged();
 }
 
 void QtStakeholderSimulationAdapter::planMission(int index, const QString &route, const QString &profile)
 {
-    if (index >= 0 && m_simulation.planMission(static_cast<std::size_t>(index),
-            route.trimmed().toStdString(), profile.toStdString()))
+    if (!actionAllowed(QStringLiteral("Plan route")))
+        return;
+    const bool success = index >= 0 && m_simulation.planMission(static_cast<std::size_t>(index),
+        route.trimmed().toStdString(), profile.toStdString());
+    if (success)
         emitStateChanged();
+    reportAction(success ? QStringLiteral("Route plan updated.") : QStringLiteral("Select a mission and a valid route."), success);
 }
 
 void QtStakeholderSimulationAdapter::bookMission(int index)
 {
-    if (index >= 0 && m_simulation.bookMission(static_cast<std::size_t>(index)))
+    if (!actionAllowed(QStringLiteral("Book mission")))
+        return;
+    const bool success = index >= 0 && m_simulation.bookMission(static_cast<std::size_t>(index));
+    if (success)
         emitStateChanged();
+    reportAction(success ? QStringLiteral("Mission booking evaluated.") : QStringLiteral("Select a mission to book."), success);
 }
 
 void QtStakeholderSimulationAdapter::delayMission(int index)
 {
-    if (index >= 0 && m_simulation.delayMission(static_cast<std::size_t>(index)))
+    if (!actionAllowed(QStringLiteral("Delay mission")))
+        return;
+    const bool success = index >= 0 && m_simulation.delayMission(static_cast<std::size_t>(index));
+    if (success)
         emitStateChanged();
+    reportAction(success ? QStringLiteral("Mission delayed by five minutes; slot returned for review.") : QStringLiteral("Select a mission to delay."), success);
 }
 
 void QtStakeholderSimulationAdapter::assignGate(int index)
 {
-    if (index >= 0 && m_simulation.assignGate(static_cast<std::size_t>(index)))
+    if (!actionAllowed(QStringLiteral("Assign gate")))
+        return;
+    const bool success = index >= 0 && m_simulation.assignGate(static_cast<std::size_t>(index));
+    if (success)
         emitStateChanged();
+    reportAction(success ? QStringLiteral("Gate request processed.") : QStringLiteral("Select a vertiport."), success);
 }
 
 void QtStakeholderSimulationAdapter::startCharging(int index)
 {
-    if (index >= 0 && m_simulation.startCharging(static_cast<std::size_t>(index)))
+    if (!actionAllowed(QStringLiteral("Start charging")))
+        return;
+    const bool success = index >= 0 && m_simulation.startCharging(static_cast<std::size_t>(index));
+    if (success)
         emitStateChanged();
+    reportAction(success ? QStringLiteral("Charging request processed.") : QStringLiteral("Select a vertiport."), success);
 }
 
 void QtStakeholderSimulationAdapter::decideSlot(int index, bool granted)
 {
-    if (index >= 0 && m_simulation.decideSlot(static_cast<std::size_t>(index), granted))
+    if (!actionAllowed(granted ? QStringLiteral("Grant slot") : QStringLiteral("Deny slot")))
+        return;
+    const bool success = index >= 0 && m_simulation.decideSlot(static_cast<std::size_t>(index), granted);
+    if (success)
         emitStateChanged();
+    reportAction(success ? (granted ? QStringLiteral("Slot granted.") : QStringLiteral("Slot denied."))
+                         : QStringLiteral("Select a slot request."), success);
 }
 
 void QtStakeholderSimulationAdapter::setBoundaryEnforcement(int index, bool enforced)
 {
-    if (index >= 0 && m_simulation.setBoundaryEnforcement(static_cast<std::size_t>(index), enforced))
+    if (!actionAllowed(enforced ? QStringLiteral("Enforce boundary") : QStringLiteral("Set monitor only")))
+        return;
+    const bool success = index >= 0 && m_simulation.setBoundaryEnforcement(static_cast<std::size_t>(index), enforced);
+    if (success)
         emitStateChanged();
+    reportAction(success ? (enforced ? QStringLiteral("Boundary enforcement applied.") : QStringLiteral("Boundary set to monitor only; held slots returned for review."))
+                         : QStringLiteral("Select a compliance zone."), success);
 }
 
 void QtStakeholderSimulationAdapter::advanceSimulation()
 {
+    if (!actionAllowed(QStringLiteral("Step simulation")))
+        return;
     m_simulation.advance();
+    emitStateChanged();
     emit simulationTimeChanged();
-    emit vertiportsChanged();
 }
 
 void QtStakeholderSimulationAdapter::resetSimulation()
 {
+    if (!actionAllowed(QStringLiteral("Reset simulation")))
+        return;
     m_simulation.reset();
     emitStateChanged();
     emit simulationTimeChanged();
+    reportAction(QStringLiteral("Local simulation reset to 08:15."), true);
+}
+
+bool QtStakeholderSimulationAdapter::actionAllowed(const QString &action)
+{
+    if (localControlsEnabled())
+        return true;
+    reportAction(action + QStringLiteral(" is unavailable while the MQTT event feed is connected."), false);
+    return false;
+}
+
+void QtStakeholderSimulationAdapter::reportAction(const QString &message, bool success)
+{
+    m_actionMessage = message;
+    m_actionSeverity = success ? QStringLiteral("success") : QStringLiteral("warning");
+    emit actionFeedbackChanged();
 }
 
 void QtStakeholderSimulationAdapter::emitStateChanged()
@@ -220,4 +330,12 @@ void QtStakeholderSimulationAdapter::emitStateChanged()
     emit slotRequestsChanged();
     emit complianceZonesChanged();
     emit activityLogChanged();
+}
+
+void QtStakeholderSimulationAdapter::toggleRunning()
+{
+    if (!actionAllowed(QStringLiteral("Run or pause simulation")))
+        return;
+    setRunning(!m_running);
+    reportAction(m_running ? QStringLiteral("Local simulation running.") : QStringLiteral("Local simulation paused."), true);
 }

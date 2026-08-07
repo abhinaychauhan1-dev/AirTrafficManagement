@@ -9,7 +9,9 @@ SOURCES += \
 	adapters/QtStakeholderSimulationAdapter.cpp \
 	face/components/StakeholderSimulationComponent.cpp \
 	face/transport/InMemoryEventTransport.cpp \
+	models/FlightFilterProxyModel.cpp \
 	models/FlightListModel.cpp \
+	viewmodels/AppShellViewModel.cpp \
 	viewmodels/AirTrafficViewModel.cpp
 
 HEADERS += \
@@ -20,7 +22,9 @@ HEADERS += \
 	face/interfaces/IStakeholderSimulation.h \
 	face/components/StakeholderSimulationComponent.h \
 	face/transport/InMemoryEventTransport.h \
+	models/FlightFilterProxyModel.h \
 	models/FlightListModel.h \
+	viewmodels/AppShellViewModel.h \
 	viewmodels/AirTrafficViewModel.h
 
 RESOURCES += qml.qrc

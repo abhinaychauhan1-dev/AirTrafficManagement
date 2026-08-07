@@ -23,7 +23,7 @@ bool environmentFlag(const char *name)
 quint16 environmentPort(bool tls)
 {
     bool valid = false;
-    const uint port = qEnvironmentVariableIntValue("ATM_MQTT_PORT", &valid);
+    const uint port = qEnvironmentVariableIntValue("ATTM_MQTT_PORT", &valid);
     return valid && port > 0 && port <= 65535 ? static_cast<quint16>(port)
                                                : static_cast<quint16>(tls ? 8883 : 1883);
 }
@@ -32,15 +32,15 @@ quint16 environmentPort(bool tls)
 
 MqttEventTransport::MqttEventTransport(QObject *parent, std::size_t capacity)
     : QObject(parent)
-    , m_host(qEnvironmentVariable("ATM_MQTT_HOST", QStringLiteral("localhost")))
-    , m_topic(qEnvironmentVariable("ATM_MQTT_TOPIC", QStringLiteral("atm/events")))
-    , m_username(qEnvironmentVariable("ATM_MQTT_USERNAME"))
-    , m_password(qEnvironmentVariable("ATM_MQTT_PASSWORD"))
-    , m_clientId(QStringLiteral("atm-%1-%2")
+    , m_host(qEnvironmentVariable("ATTM_MQTT_HOST", QStringLiteral("localhost")))
+    , m_topic(qEnvironmentVariable("ATTM_MQTT_TOPIC", QStringLiteral("attm/events")))
+    , m_username(qEnvironmentVariable("ATTM_MQTT_USERNAME"))
+    , m_password(qEnvironmentVariable("ATTM_MQTT_PASSWORD"))
+    , m_clientId(QStringLiteral("attm-%1-%2")
                      .arg(QHostInfo::localHostName().left(20),
                           QUuid::createUuid().toString(QUuid::Id128).left(12)))
     , m_capacity(capacity)
-    , m_useTls(environmentFlag("ATM_MQTT_TLS"))
+    , m_useTls(environmentFlag("ATTM_MQTT_TLS"))
 {
     m_port = environmentPort(m_useTls);
     m_socket = m_useTls ? static_cast<QAbstractSocket *>(new QSslSocket(this))

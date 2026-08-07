@@ -39,12 +39,12 @@ the broker is unavailable. Configure it with environment variables before launch
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `ATM_MQTT_HOST` | `localhost` | Broker hostname |
-| `ATM_MQTT_PORT` | `1883` (`8883` with TLS) | Broker port |
-| `ATM_MQTT_TOPIC` | `atm/events` | Publish and subscribe topic |
-| `ATM_MQTT_USERNAME` | empty | Optional username |
-| `ATM_MQTT_PASSWORD` | empty | Optional password |
-| `ATM_MQTT_TLS` | `false` | Set to `true` for TLS certificate validation |
+| `ATTM_MQTT_HOST` | `localhost` | Broker hostname |
+| `ATTM_MQTT_PORT` | `1883` (`8883` with TLS) | Broker port |
+| `ATTM_MQTT_TOPIC` | `attm/events` | Publish and subscribe topic |
+| `ATTM_MQTT_USERNAME` | empty | Optional username |
+| `ATTM_MQTT_PASSWORD` | empty | Optional password |
+| `ATTM_MQTT_TLS` | `false` | Set to `true` for TLS certificate validation |
 
 Windows, Qt event-loop, and rendering services act as the current Operating System/Platform-Specific Services environment. External sensors, persistence, and network gateways should be added behind new interfaces rather than called from portable components.
 
