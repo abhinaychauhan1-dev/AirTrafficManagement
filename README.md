@@ -4,33 +4,33 @@ A desktop-based Air Taxi Traffic Management and simulation application built usi
 
 ---
 
-## 🚀 Features
+## Features
 
-* **Real-Time Simulation:** Simulate aircraft movement, routing, and radar tracking.
-* **Interactive UI:** Built with Qt Widgets / Qt Quick for responsive, high-performance visualization of airspace maps.
-* **Conflict Detection:** (If applicable) Algorithms to monitor proximity and prevent route collisions.
-* **Flight Data Management:** Load, manage, and log flight plans, waypoint coordinates, and telemetry data.
-
----
-
-## 🛠️ Tech Stack
-
-* **Language:** C++ (C++11 or higher)
-* **Framework:** Qt 5 / Qt 6
-* **Build System:** CMake / qmake
+* **Real-Time Simulation:** Simulate air taxi movement, routing, and radar tracking.
+* **Interactive UI:** Built with Qt Quick for responsive airspace and mission visualization.
+* **Conflict Detection:** Monitor separation alerts and corridor compliance.
+* **Mission Management:** Coordinate active missions, vertiports, UTM slots, and operational events.
 
 ---
 
-## 📂 Project Structure
+## Tech Stack
+
+* **Language:** C++17
+* **Framework:** Qt 6 with Qt Quick and Qt Quick Controls 2
+* **Build System:** qmake
+
+---
+
+## Project Structure
 ```text
 AirTaxiTrafficManagement/
-│
-├── 📁 src/                 # Source files (.cpp, .h)
-│   ├── 📁 ui/              # User interface components and windows
-│   ├── 📁 core/            # Business logic (Aircraft, Radar, Simulation engine)
-│   └── 📁 models/          # Data models for flight lists and maps
-│
-├── 📁 resources/           # Icons, maps, configuration files, and assets
-├── 📁 tests/               # Unit and integration tests
-├── CMakeLists.txt          # CMake configuration file (or AirTaxiTrafficManagement.pro)
-└── README.md               # Project documentation
+|-- adapters/                    # Qt adapters for transport and FACE components
+|-- docs/                        # Architecture documentation
+|-- face/                        # Portable contracts, interfaces, and components
+|-- models/                      # Air taxi list and filter models
+|-- presentation/                # QML application views and controls
+|-- viewmodels/                  # Application and surveillance view models
+|-- AirTaxiTrafficManagement.pro # Active qmake project
+|-- main.cpp                     # Application composition root
+|-- qml.qrc                      # QML resources
+`-- README.md

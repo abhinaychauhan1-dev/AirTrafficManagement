@@ -6,12 +6,12 @@ AppShellViewModel::AppShellViewModel(QObject *parent)
     : QObject(parent)
     , m_modules{
           QVariantMap{
-              {"label", "Live Radar View"},
-              {"description", "Real-time map of aircraft moving through the monitored airspace."},
+              {"label", "Live Air Taxi Network"},
+              {"description", "Real-time map of eVTOL air taxis moving between Delhi vertiports."},
               {"availability", "LIVE"}},
           QVariantMap{
-              {"label", "Flight & Traffic Simulation"},
-              {"description", "Simulated traffic scenarios for testing incoming-aircraft handling."},
+              {"label", "Active Taxi Missions"},
+              {"description", "Current eVTOL missions with their assigned vertiports, UTM slots, and compliance status."},
               {"availability", "SIMULATION"}},
           QVariantMap{
               {"label", "System Health & Power"},
@@ -23,7 +23,7 @@ AppShellViewModel::AppShellViewModel(QObject *parent)
               {"capabilities", QStringList{"Energy reserve and degradation model", "Reachable ALL ranking", "Diversion recommendation workflow"}}},
           QVariantMap{
               {"label", "Performance Stress Test"},
-              {"description", "Heavy aircraft-load scenarios that measure software limits and resilience."},
+              {"description", "High-density air-taxi demand scenarios that measure network limits and resilience."},
               {"availability", "PLANNED"},
               {"featureNumber", "03"},
               {"title", "DISRUPTION AND STRESS-TESTING SCENARIOS"},

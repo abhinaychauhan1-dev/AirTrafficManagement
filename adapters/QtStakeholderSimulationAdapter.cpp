@@ -2,6 +2,8 @@
 
 #include <QTime>
 #include <QVariantMap>
+#include <cstddef> // For std::size_t
+#include <string> // For std::string
 
 namespace {
 
@@ -39,6 +41,7 @@ QtStakeholderSimulationAdapter::QtStakeholderSimulationAdapter(
 QVariantList QtStakeholderSimulationAdapter::missions() const
 {
     QVariantList result;
+    int sourceIndex = 0;
     for (const atm::face::v1::Mission &mission : m_simulation.missions()) {
         const bool canBook = mission.healthPercent >= 60;
         result.append(QVariantMap{
@@ -50,6 +53,7 @@ QVariantList QtStakeholderSimulationAdapter::missions() const
             {QStringLiteral("status"), QString::fromStdString(mission.status)},
             {QStringLiteral("canBook"), canBook},
             {QStringLiteral("severity"), canBook ? QStringLiteral("normal") : QStringLiteral("warning")}
+            , {QStringLiteral("sourceIndex"), sourceIndex++}
         });
     }
     return result;
@@ -58,6 +62,7 @@ QVariantList QtStakeholderSimulationAdapter::missions() const
 QVariantList QtStakeholderSimulationAdapter::vertiports() const
 {
     QVariantList result;
+    int sourceIndex = 0;
     for (const atm::face::v1::Vertiport &vertiport : m_simulation.vertiports()) {
         const bool saturated = vertiport.freeGates == 0;
         result.append(QVariantMap{
@@ -73,6 +78,7 @@ QVariantList QtStakeholderSimulationAdapter::vertiports() const
             {QStringLiteral("status"), QString::fromStdString(vertiport.status)},
             {QStringLiteral("saturated"), saturated},
             {QStringLiteral("severity"), saturated ? QStringLiteral("warning") : QStringLiteral("normal")}
+            , {QStringLiteral("sourceIndex"), sourceIndex++}
         });
     }
     return result;
@@ -81,6 +87,7 @@ QVariantList QtStakeholderSimulationAdapter::vertiports() const
 QVariantList QtStakeholderSimulationAdapter::slotRequests() const
 {
     QVariantList result;
+    int sourceIndex = 0;
     for (const atm::face::v1::SlotRequest &slot : m_simulation.slotRequests()) {
         const QString status = QString::fromStdString(slot.status);
         const bool adverse = status == QStringLiteral("DENIED") || status == QStringLiteral("HELD - NOISE");
@@ -91,6 +98,7 @@ QVariantList QtStakeholderSimulationAdapter::slotRequests() const
             {QStringLiteral("desired"), QString::fromStdString(slot.desiredTime)},
             {QStringLiteral("status"), status},
             {QStringLiteral("severity"), adverse ? QStringLiteral("warning") : QStringLiteral("normal")}
+            , {QStringLiteral("sourceIndex"), sourceIndex++}
         });
     }
     return result;
@@ -99,6 +107,7 @@ QVariantList QtStakeholderSimulationAdapter::slotRequests() const
 QVariantList QtStakeholderSimulationAdapter::complianceZones() const
 {
     QVariantList result;
+    int sourceIndex = 0;
     for (const atm::face::v1::ComplianceZone &zone : m_simulation.complianceZones()) {
         const bool capExceeded = zone.currentOverflights >= zone.overflightCap;
         result.append(QVariantMap{
@@ -111,6 +120,7 @@ QVariantList QtStakeholderSimulationAdapter::complianceZones() const
             {QStringLiteral("status"), QString::fromStdString(zone.status)},
             {QStringLiteral("capExceeded"), capExceeded},
             {QStringLiteral("severity"), capExceeded ? QStringLiteral("warning") : QStringLiteral("normal")}
+            , {QStringLiteral("sourceIndex"), sourceIndex++}
         });
     }
     return result;
@@ -125,6 +135,75 @@ QVariantList QtStakeholderSimulationAdapter::activityLog() const
             time.toString(QStringLiteral("HH:mm")),
             sourceName(event.source).leftJustified(8),
             QString::fromStdString(event.message)));
+    }
+    return result;
+}
+
+int QtStakeholderSimulationAdapter::activeMissionIndex() const
+{
+    return m_activeMissionIndex;
+}
+
+void QtStakeholderSimulationAdapter::setActiveMissionIndex(int index)
+{
+    const int missionCount = static_cast<int>(m_simulation.missions().size());
+    const int boundedIndex = missionCount > 0 ? qBound(0, index, missionCount - 1) : -1;
+    if (m_activeMissionIndex == boundedIndex)
+        return;
+    m_activeMissionIndex = boundedIndex;
+    emit activeMissionChanged();
+}
+
+QVariantMap QtStakeholderSimulationAdapter::activeMission() const
+{
+    const QVariantList allMissions = missions();
+    return m_activeMissionIndex >= 0 && m_activeMissionIndex < allMissions.size()
+        ? allMissions.at(m_activeMissionIndex).toMap() : QVariantMap{};
+}
+
+QVariantList QtStakeholderSimulationAdapter::activeMissionSlots() const
+{
+    QVariantList result;
+    const QString callSign = activeMission().value(QStringLiteral("callSign")).toString();
+    for (const QVariant &entry : slotRequests()) {
+        if (entry.toMap().value(QStringLiteral("callSign")).toString() == callSign)
+            result.append(entry);
+    }
+    return result;
+}
+
+QVariantList QtStakeholderSimulationAdapter::activeMissionVertiports() const
+{
+    QVariantList result;
+    const QString route = activeMission().value(QStringLiteral("route")).toString();
+    const QStringList endpoints = route.split(QStringLiteral(" - "));
+    for (const QVariant &entry : vertiports()) {
+        const QVariantMap vertiport = entry.toMap();
+        if (endpoints.contains(vertiport.value(QStringLiteral("name")).toString()))
+            result.append(entry);
+    }
+    return result;
+}
+
+QVariantList QtStakeholderSimulationAdapter::activeMissionComplianceZones() const
+{
+    QVariantList result;
+    const QVariantList missionSlots = activeMissionSlots();
+    const QString corridor = missionSlots.isEmpty() ? QString() : missionSlots.first().toMap().value(QStringLiteral("corridor")).toString();
+    for (const QVariant &entry : complianceZones()) {
+        if (entry.toMap().value(QStringLiteral("track")).toString() == corridor)
+            result.append(entry);
+    }
+    return result;
+}
+
+QVariantList QtStakeholderSimulationAdapter::activeMissionActivity() const
+{
+    QVariantList result;
+    const QString callSign = activeMission().value(QStringLiteral("callSign")).toString();
+    for (const QVariant &entry : activityLog()) {
+        if (entry.toString().contains(callSign, Qt::CaseInsensitive))
+            result.append(entry);
     }
     return result;
 }
@@ -153,14 +232,14 @@ QString QtStakeholderSimulationAdapter::transportStatusText() const
 
 QStringList QtStakeholderSimulationAdapter::stakeholderTabs() const
 {
-    return {QStringLiteral("FLEET OPERATIONS"), QStringLiteral("VERTIPORT"),
-            QStringLiteral("ANSP / PSU"), QStringLiteral("URBAN AUTHORITY")};
+    return {QStringLiteral("MISSION"), QStringLiteral("VERTIPORTS"),
+        QStringLiteral("UTM SLOT"), QStringLiteral("COMPLIANCE")};
 }
 
 QStringList QtStakeholderSimulationAdapter::routeOptions() const
 {
-    return {QStringLiteral("Dilli Haat - IGI"), QStringLiteral("Noida - Connaught Place"),
-            QStringLiteral("Gurugram - IGI"), QStringLiteral("Rohini - Aerocity")};
+    return {QStringLiteral("VPT-GGM - VPT-IGI"), QStringLiteral("VPT-NOIDA - VPT-CP"),
+        QStringLiteral("VPT-DILLI - VPT-IGI"), QStringLiteral("VPT-NOIDA - VPT-GGM")};
 }
 
 QStringList QtStakeholderSimulationAdapter::missionProfiles() const
@@ -330,6 +409,7 @@ void QtStakeholderSimulationAdapter::emitStateChanged()
     emit slotRequestsChanged();
     emit complianceZonesChanged();
     emit activityLogChanged();
+    emit activeMissionChanged();
 }
 
 void QtStakeholderSimulationAdapter::toggleRunning()

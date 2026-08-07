@@ -24,6 +24,8 @@ int main(int argc, char *argv[])
                      &stakeholderViewModel, &QtStakeholderSimulationAdapter::setMqttConnected);
     QObject::connect(&eventTransport, &MqttEventTransport::eventsChanged,
                      &stakeholderViewModel, &QtStakeholderSimulationAdapter::activityLogChanged);
+    QObject::connect(&eventTransport, &MqttEventTransport::eventsChanged,
+                     &stakeholderViewModel, &QtStakeholderSimulationAdapter::activeMissionChanged);
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("airTrafficViewModel"), &viewModel);
     engine.rootContext()->setContextProperty(QStringLiteral("appShellViewModel"), &shellViewModel);

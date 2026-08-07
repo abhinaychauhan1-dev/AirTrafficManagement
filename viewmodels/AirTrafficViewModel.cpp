@@ -5,9 +5,9 @@
 
 namespace {
 
-constexpr int kMinimumRangeNm = 20;
-constexpr int kMaximumRangeNm = 160;
-constexpr int kRangeStepNm = 20;
+constexpr int kMinimumRangeNm = 5;
+constexpr int kMaximumRangeNm = 40;
+constexpr int kRangeStepNm = 5;
 
 QVariantMap point(qreal x, qreal y)
 {
@@ -18,70 +18,111 @@ QVariantMap point(qreal x, qreal y)
 
 AirTrafficViewModel::AirTrafficViewModel(QObject *parent)
     : QObject(parent)
-    , m_flights(this)
-    , m_filteredFlights(this)
+    , m_airTaxis(this)
+    , m_filteredAirTaxis(this)
 {
-    m_filteredFlights.setSourceModel(&m_flights);
+    m_filteredAirTaxis.setSourceModel(&m_airTaxis);
     m_clockTimer.setInterval(1000);
-    connect(&m_clockTimer, &QTimer::timeout, this, &AirTrafficViewModel::utcClockChanged);
+    connect(&m_clockTimer, &QTimer::timeout, this, &AirTrafficViewModel::clockChanged);
     m_clockTimer.start();
 
-    m_currentAlertCallSign = alertFlight().value(QStringLiteral("callSign")).toString();
+    m_currentAlertCallSign = alertAirTaxi().value(QStringLiteral("callSign")).toString();
     m_surveillanceTimer.setInterval(1000);
     connect(&m_surveillanceTimer, &QTimer::timeout, this, &AirTrafficViewModel::advanceSurveillance);
     m_surveillanceTimer.start();
 }
 
-QAbstractItemModel *AirTrafficViewModel::flights()
+QAbstractItemModel *AirTrafficViewModel::airTaxis()
 {
-    return &m_flights;
+    return &m_airTaxis;
 }
 
-QAbstractItemModel *AirTrafficViewModel::filteredFlights()
+QAbstractItemModel *AirTrafficViewModel::filteredAirTaxis()
 {
-    return &m_filteredFlights;
+    return &m_filteredAirTaxis;
 }
 
-QString AirTrafficViewModel::flightFilter() const
+QString AirTrafficViewModel::airTaxiFilter() const
 {
-    return m_flightFilter;
+    return m_airTaxiFilter;
 }
 
-void AirTrafficViewModel::setFlightFilter(const QString &filter)
+void AirTrafficViewModel::setAirTaxiFilter(const QString &filter)
 {
-    if (m_flightFilter == filter)
+    if (m_airTaxiFilter == filter)
         return;
-    m_flightFilter = filter;
-    m_filteredFlights.setQuery(filter);
-    if (m_filteredFlights.rowCount() > 0 && selectedFilteredTrack() < 0)
-        setSelectedTrack(m_filteredFlights.sourceRowForProxyRow(0));
-    emit flightFilterChanged();
+    m_airTaxiFilter = filter;
+    m_filteredAirTaxis.setQuery(filter);
+    if (m_filteredAirTaxis.rowCount() > 0 && selectedFilteredTrack() < 0)
+        setSelectedTrack(m_filteredAirTaxis.sourceRowForProxyRow(0));
+    emit airTaxiFilterChanged();
     emit selectedTrackChanged();
 }
 
-int AirTrafficViewModel::filteredFlightCount() const
+QString AirTrafficViewModel::altitudeFilter() const { return m_altitudeFilter; }
+QString AirTrafficViewModel::phaseFilter() const { return m_phaseFilter; }
+QString AirTrafficViewModel::squawkFilter() const { return m_squawkFilter; }
+
+void AirTrafficViewModel::setAltitudeFilter(const QString &filter)
 {
-    return m_filteredFlights.rowCount();
+    if (m_altitudeFilter == filter)
+        return;
+    m_altitudeFilter = filter;
+    m_filteredAirTaxis.setAltitudeBand(filter);
+    emit airTaxiFilterChanged();
+    emit selectedTrackChanged();
 }
 
-int AirTrafficViewModel::flightCount() const
+void AirTrafficViewModel::setPhaseFilter(const QString &filter)
 {
-    return m_flights.rowCount();
+    if (m_phaseFilter == filter)
+        return;
+    m_phaseFilter = filter;
+    m_filteredAirTaxis.setMissionPhase(filter);
+    emit airTaxiFilterChanged();
+    emit selectedTrackChanged();
+}
+
+void AirTrafficViewModel::setSquawkFilter(const QString &filter)
+{
+    if (m_squawkFilter == filter)
+        return;
+    m_squawkFilter = filter;
+    m_filteredAirTaxis.setSquawkCode(filter);
+    emit airTaxiFilterChanged();
+    emit selectedTrackChanged();
+}
+
+void AirTrafficViewModel::clearQuickFilters()
+{
+    setAltitudeFilter({});
+    setPhaseFilter({});
+    setSquawkFilter({});
+}
+
+int AirTrafficViewModel::filteredAirTaxiCount() const
+{
+    return m_filteredAirTaxis.rowCount();
+}
+
+int AirTrafficViewModel::airTaxiCount() const
+{
+    return m_airTaxis.rowCount();
 }
 
 int AirTrafficViewModel::alertCount() const
 {
-    return m_flights.alertCount();
+    return m_airTaxis.alertCount();
 }
 
-QVariantMap AirTrafficViewModel::alertFlight() const
+QVariantMap AirTrafficViewModel::alertAirTaxi() const
 {
-    return m_flights.alertFlight();
+    return m_airTaxis.alertAirTaxi();
 }
 
-QVariantMap AirTrafficViewModel::selectedFlight() const
+QVariantMap AirTrafficViewModel::selectedAirTaxi() const
 {
-    return m_flights.flightAt(m_selectedTrack);
+    return m_airTaxis.airTaxiAt(m_selectedTrack);
 }
 
 int AirTrafficViewModel::selectedTrack() const
@@ -91,12 +132,12 @@ int AirTrafficViewModel::selectedTrack() const
 
 int AirTrafficViewModel::selectedFilteredTrack() const
 {
-    return m_filteredFlights.proxyRowForSourceRow(m_selectedTrack);
+    return m_filteredAirTaxis.proxyRowForSourceRow(m_selectedTrack);
 }
 
 void AirTrafficViewModel::setSelectedTrack(int selectedTrack)
 {
-    const int boundedTrack = qBound(0, selectedTrack, m_flights.rowCount() - 1);
+    const int boundedTrack = qBound(0, selectedTrack, m_airTaxis.rowCount() - 1);
     if (m_selectedTrack == boundedTrack)
         return;
 
@@ -178,15 +219,15 @@ QVariantList AirTrafficViewModel::operationalFacts() const
 {
     const QVariantMap weather = weatherSummary();
     return {
-        QVariantMap{{"label", "SECTOR"}, {"value", "DLC-W"}},
-        QVariantMap{{"label", "FREQUENCY"}, {"value", "128.35"}},
+        QVariantMap{{"label", "UAM ZONE"}, {"value", "DELHI-C"}},
+        QVariantMap{{"label", "ACTIVE PADS"}, {"value", "14 / 16"}},
         QVariantMap{{"label", "QNH"}, {"value", weather.value("qnh").toString() + QStringLiteral(" hPa")}}
     };
 }
 
-QVariantMap AirTrafficViewModel::activeRunway() const
+QVariantMap AirTrafficViewModel::activeVertiport() const
 {
-    return {{"airport", "VIDP"}, {"runway", "28"}, {"heading", 281}, {"ils", "110.3"}};
+    return {{"name", "IGI V2"}, {"pad", "P3"}, {"heading", 281}, {"status", "OPEN"}};
 }
 
 QVariantMap AirTrafficViewModel::weatherSummary() const
@@ -194,9 +235,9 @@ QVariantMap AirTrafficViewModel::weatherSummary() const
     const int windDirection = 278 + (m_surveillanceTick / 5) % 9;
     const int qnh = 1008 + (m_surveillanceTick / 30) % 2;
     return {
-        {"station", "VIDP"}, {"temperature", 31}, {"cloud", "FEW 3,000 FT"},
+        {"station", "DELHI UAM NET"}, {"temperature", 31}, {"cloud", "URBAN CEILING 3,000 FT"},
         {"windDirection", windDirection}, {"wind", "12 KT  G18"}, {"visibility", "6 KM"},
-        {"qnh", QString::number(qnh)}, {"dewPoint", 24}, {"advisory", "TEMPO TSRA  •  CB NW OF FIELD"}
+        {"qnh", QString::number(qnh)}, {"dewPoint", 24}, {"advisory", "GUST CAUTION  •  IGI V2 / AERO V7 CORRIDOR"}
     };
 }
 
@@ -210,16 +251,16 @@ QVariantList AirTrafficViewModel::weatherMetrics() const
     };
 }
 
-QVariantList AirTrafficViewModel::selectedFlightMetrics() const
+QVariantList AirTrafficViewModel::selectedAirTaxiMetrics() const
 {
-    const QVariantMap flight = selectedFlight();
+    const QVariantMap airTaxi = selectedAirTaxi();
     return {
-        QVariantMap{{"label", "SQUAWK"}, {"value", flight.value("squawk")}},
-        QVariantMap{{"label", "CLEARED"}, {"value", flight.value("level")}},
-        QVariantMap{{"label", "GROUND SPEED"}, {"value", flight.value("speed").toString() + QStringLiteral(" KT")}},
-        QVariantMap{{"label", "TREND"}, {"value", flight.value("trend")}},
-        QVariantMap{{"label", "HEADING"}, {"value", flight.value("heading").toString() + QStringLiteral("°")}},
-        QVariantMap{{"label", "AIRCRAFT"}, {"value", flight.value("aircraftType")}}
+        QVariantMap{{"label", "SQUAWK"}, {"value", airTaxi.value("squawk")}},
+        QVariantMap{{"label", "ALTITUDE"}, {"value", airTaxi.value("level")}},
+        QVariantMap{{"label", "AIR SPEED"}, {"value", airTaxi.value("speed").toString() + QStringLiteral(" KT")}},
+        QVariantMap{{"label", "BATTERY"}, {"value", airTaxi.value("battery").toString() + QStringLiteral("%")}},
+        QVariantMap{{"label", "HEADING"}, {"value", airTaxi.value("heading").toString() + QStringLiteral("°")}},
+        QVariantMap{{"label", "EVTOL"}, {"value", airTaxi.value("vehicleType")}}
     };
 }
 
@@ -229,31 +270,31 @@ QVariantList AirTrafficViewModel::sectorLoads() const
     int east = 0;
     int north = 0;
     int south = 0;
-    for (int row = 0; row < m_flights.rowCount(); ++row) {
-        const QVariantMap flight = m_flights.flightAt(row);
-        flight.value("positionX").toReal() < .5 ? ++west : ++east;
-        flight.value("positionY").toReal() < .5 ? ++north : ++south;
+    for (int row = 0; row < m_airTaxis.rowCount(); ++row) {
+        const QVariantMap airTaxi = m_airTaxis.airTaxiAt(row);
+        airTaxi.value("positionX").toReal() < .5 ? ++west : ++east;
+        airTaxi.value("positionY").toReal() < .5 ? ++north : ++south;
     }
-    const qreal total = qMax(1, m_flights.rowCount());
+    const qreal total = qMax(1, m_airTaxis.rowCount());
     return {
-        QVariantMap{{"name", "DLC-W"}, {"trackCount", west}, {"load", west / total}, {"category", "primary"}},
-        QVariantMap{{"name", "DLC-E"}, {"trackCount", east}, {"load", east / total}, {"category", "primary"}},
-        QVariantMap{{"name", "TMA-N"}, {"trackCount", north}, {"load", north / total}, {"category", "secondary"}},
-        QVariantMap{{"name", "TMA-S"}, {"trackCount", south}, {"load", south / total}, {"category", "secondary"}}
+        QVariantMap{{"name", "UAM WEST"}, {"trackCount", west}, {"load", west / total}, {"category", "primary"}},
+        QVariantMap{{"name", "UAM EAST"}, {"trackCount", east}, {"load", east / total}, {"category", "primary"}},
+        QVariantMap{{"name", "CITY NORTH"}, {"trackCount", north}, {"load", north / total}, {"category", "secondary"}},
+        QVariantMap{{"name", "CITY SOUTH"}, {"trackCount", south}, {"load", south / total}, {"category", "secondary"}}
     };
 }
 
 QVariantMap AirTrafficViewModel::datalinkStatus() const
 {
-    return {{"online", true}, {"label", "CPDLC ONLINE"}, {"messageCount", 12 + m_surveillanceTick / 15}};
+    return {{"online", true}, {"label", "UTM LINK ONLINE"}, {"messageCount", 12 + m_surveillanceTick / 15}};
 }
 
 QVariantMap AirTrafficViewModel::separationAlert() const
 {
     return {
         {"code", "STCA"},
-        {"title", QStringLiteral("%1  •  SEPARATION CONFLICT").arg(alertFlight().value("callSign").toString())},
-        {"instruction", "REVIEW CONFLICT TRACK AND COORDINATE RESOLUTION"}
+        {"title", QStringLiteral("%1  •  CORRIDOR SEPARATION ALERT").arg(alertAirTaxi().value("callSign").toString())},
+        {"instruction", "REVIEW AIR TAXI ROUTE AND COORDINATE CORRIDOR RESOLUTION"}
     };
 }
 
@@ -282,27 +323,37 @@ QVariantList AirTrafficViewModel::weatherCells() const
     };
 }
 
-QString AirTrafficViewModel::radarId() const { return QStringLiteral("RADAR 01"); }
+QString AirTrafficViewModel::radarId() const { return QStringLiteral("UAM SURVEILLANCE 01"); }
 QString AirTrafficViewModel::updateRate() const { return QStringLiteral("1.0s"); }
 QString AirTrafficViewModel::adsbCoverage() const { return QStringLiteral("99.8%"); }
-QString AirTrafficViewModel::controllerPosition() const { return QStringLiteral("CTRL: PRIYA S.  -  POSITION: DWC-04"); }
-QString AirTrafficViewModel::dataStatusText() const { return QStringLiteral("SIMULATED SURVEILLANCE"); }
-QString AirTrafficViewModel::lastUpdateTime() const { return utcTime(); }
+QString AirTrafficViewModel::controllerPosition() const { return QStringLiteral("UAM OPS: PRIYA S.  -  DESK: DEL-C04"); }
+QString AirTrafficViewModel::dataStatusText() const { return QStringLiteral("LIVE AIR TAXI FEED"); }
+QString AirTrafficViewModel::lastUpdateTime() const { return istTime(); }
 qreal AirTrafficViewModel::viewCenterX() const { return m_viewCenterX; }
 qreal AirTrafficViewModel::viewCenterY() const { return m_viewCenterY; }
-QString AirTrafficViewModel::utcTime() const { return QDateTime::currentDateTimeUtc().toString(QStringLiteral("HH:mm:ss")); }
-QString AirTrafficViewModel::utcDate() const { return QDateTime::currentDateTimeUtc().toString(QStringLiteral("dd MMM yyyy 'UTC'")).toUpper(); }
+QString AirTrafficViewModel::istTime() const
+{
+    return QDateTime::currentDateTimeUtc().addSecs(19800)
+        .toString(QStringLiteral("HH:mm:ss"));
+}
+
+QString AirTrafficViewModel::istDate() const
+{
+    return QDateTime::currentDateTimeUtc().addSecs(19800)
+        .toString(QStringLiteral("dd MMM yyyy 'IST'"))
+        .toUpper();
+}
 
 void AirTrafficViewModel::selectTrack(int sourceIndex)
 {
-    if (m_filteredFlights.proxyRowForSourceRow(sourceIndex) < 0)
-        setFlightFilter(QString());
+    if (m_filteredAirTaxis.proxyRowForSourceRow(sourceIndex) < 0)
+        setAirTaxiFilter(QString());
     setSelectedTrack(sourceIndex);
 }
 
 void AirTrafficViewModel::selectFilteredTrack(int proxyIndex)
 {
-    const int sourceRow = m_filteredFlights.sourceRowForProxyRow(proxyIndex);
+    const int sourceRow = m_filteredAirTaxis.sourceRowForProxyRow(proxyIndex);
     if (sourceRow >= 0)
         setSelectedTrack(sourceRow);
 }
@@ -325,9 +376,9 @@ void AirTrafficViewModel::changeRangeBySteps(int steps)
 void AirTrafficViewModel::focusTrack(int sourceIndex)
 {
     setSelectedTrack(sourceIndex);
-    const QVariantMap flight = selectedFlight();
-    m_viewCenterX = flight.value(QStringLiteral("positionX")).toReal();
-    m_viewCenterY = flight.value(QStringLiteral("positionY")).toReal();
+    const QVariantMap airTaxi = selectedAirTaxi();
+    m_viewCenterX = airTaxi.value(QStringLiteral("positionX")).toReal();
+    m_viewCenterY = airTaxi.value(QStringLiteral("positionY")).toReal();
     setRangeNm(qMin(m_rangeNm, 40));
     emit viewportChanged();
 }
@@ -336,7 +387,7 @@ void AirTrafficViewModel::resetRadarView()
 {
     m_viewCenterX = .5;
     m_viewCenterY = .51;
-    setRangeNm(80);
+    setRangeNm(20);
     emit viewportChanged();
 }
 
@@ -356,9 +407,9 @@ void AirTrafficViewModel::advanceSurveillance()
 {
     const bool alertWasActive = separationAlertActive();
     ++m_surveillanceTick;
-    m_flights.advanceOneSecond(m_surveillanceTick);
+    m_airTaxis.advanceOneSecond(m_surveillanceTick);
 
-    const QString alertCallSign = alertFlight().value(QStringLiteral("callSign")).toString();
+    const QString alertCallSign = alertAirTaxi().value(QStringLiteral("callSign")).toString();
     if (alertCallSign.isEmpty()) {
         m_alertAcknowledged = false;
         m_currentAlertCallSign.clear();
@@ -370,4 +421,16 @@ void AirTrafficViewModel::advanceSurveillance()
     emit surveillanceChanged();
     if (alertWasActive != separationAlertActive())
         emit separationAlertActiveChanged();
+}
+
+void AirTrafficViewModel::onSurveillanceUpdate()
+{
+    emit surveillanceChanged();
+    emit selectedTrackChanged();
+    emit airTaxiFilterChanged();
+}
+
+void AirTrafficViewModel::focusFilteredTrack(int proxyIndex)
+{
+    focusTrack(m_filteredAirTaxis.sourceRowForProxyRow(proxyIndex));
 }

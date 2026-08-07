@@ -196,14 +196,16 @@ void StakeholderSimulationComponent::reset()
 {
     m_minutes = 8 * 60 + 15;
     m_missions = {
-        {"ATX201", "Dilli Haat - IGI", "COMMUTER", "08:20", 86, "READY"},
-        {"SKY114", "Noida - Connaught Place", "CARGO", "08:25", 54, "HEALTH REVIEW"},
-        {"URB308", "Gurugram - IGI", "AIRPORT", "08:32", 73, "PLANNED"}
+        {"ATX201", "VPT-GGM - VPT-IGI", "COMMUTER", "08:20", 86, "READY"},
+        {"SKY114", "VPT-NOIDA - VPT-CP", "CARGO", "08:25", 54, "HEALTH REVIEW"},
+        {"URB308", "VPT-DILLI - VPT-IGI", "AIRPORT", "08:32", 73, "PLANNED"}
     };
     m_vertiports = {
         {"VPT-IGI", 6, 2, 4, 1, 34, 12, "BUSY", 0, ""},
         {"VPT-NOIDA", 4, 1, 3, 2, 18, 7, "AVAILABLE", 0, ""},
-        {"VPT-GGM", 5, 0, 3, 1, 27, 16, "SATURATED", 0, ""}
+        {"VPT-GGM", 5, 0, 3, 1, 27, 16, "SATURATED", 0, ""},
+        {"VPT-CP", 3, 2, 2, 1, 12, 8, "AVAILABLE", 0, ""},
+        {"VPT-DILLI", 4, 3, 2, 2, 16, 6, "AVAILABLE", 0, ""}
     };
     m_slotRequests = {
         {"SL-1042", "ATX201", "C-DELTA", "08:20", "PENDING"},
@@ -211,11 +213,14 @@ void StakeholderSimulationComponent::reset()
         {"SL-1044", "URB308", "C-BRAVO", "08:32", "PENDING"}
     };
     m_complianceZones = {
-        {"SOUTH DELHI QUIET ZONE", "NAB-2", 18, 16, 61, true, "BOUNDARY ACTIVE"},
-        {"YAMUNA ECO BOUNDARY", "ECO-7", 12, 12, 57, false, "CAP REACHED"},
-        {"CENTRAL NIGHT BUFFER", "NAB-5", 8, 5, 54, true, "COMPLIANT"}
+        {"SOUTH DELHI QUIET ZONE", "C-DELTA", 18, 16, 61, true, "BOUNDARY ACTIVE"},
+        {"YAMUNA ECO BOUNDARY", "C-ECHO", 12, 12, 57, false, "CAP REACHED"},
+        {"CENTRAL NIGHT BUFFER", "C-BRAVO", 8, 5, 54, true, "COMPLIANT"}
     };
     m_transport.clear();
+    publish(v1::Stakeholder::FleetOperator, "ATX201 ready for VPT-GGM departure");
+    publish(v1::Stakeholder::FleetOperator, "SKY114 held for vehicle health review");
+    publish(v1::Stakeholder::FleetOperator, "URB308 mission plan awaiting slot");
     publish(v1::Stakeholder::AnspPsu, "SL-1043 queued for flow review");
     publish(v1::Stakeholder::UrbanAuthority, "ECO-7 overflight cap reached");
     publish(v1::Stakeholder::System, "Shared stakeholder simulation initialized");

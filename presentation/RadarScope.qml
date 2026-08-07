@@ -3,11 +3,14 @@ import QtQuick
 Item {
     id: scope
 
-    property var flights
+    property var airTaxis
     property int rangeNm: 80
     property bool sweepEnabled: true
     property bool weatherEnabled: true
     property bool routesEnabled: true
+    property bool sectorBoundariesEnabled: true
+    property bool approachCorridorsEnabled: true
+    property bool geofencesEnabled: true
     property int selectedTrack: 0
     property color phosphor: "#6fffc1"
     property color mutedPhosphor: "#3b9d7d"
@@ -18,7 +21,7 @@ Item {
     property var weatherCells
     property real viewCenterX: .5
     property real viewCenterY: .51
-    readonly property real zoomScale: 80 / rangeNm
+    readonly property real zoomScale: 20 / rangeNm
 
     signal trackSelected(int index)
     signal rangeStepRequested(int steps)
@@ -43,6 +46,9 @@ Item {
     onSweepEnabledChanged: radarCanvas.requestPaint()
     onWeatherEnabledChanged: radarCanvas.requestPaint()
     onRoutesEnabledChanged: radarCanvas.requestPaint()
+    onSectorBoundariesEnabledChanged: radarCanvas.requestPaint()
+    onApproachCorridorsEnabledChanged: radarCanvas.requestPaint()
+    onGeofencesEnabledChanged: radarCanvas.requestPaint()
     onViewCenterXChanged: radarCanvas.requestPaint()
     onViewCenterYChanged: radarCanvas.requestPaint()
     onBoundaryPolylineChanged: radarCanvas.requestPaint()
@@ -85,7 +91,7 @@ Item {
                 ctx.stroke()
 
                 ctx.fillStyle = "#587b71"
-                ctx.font = "9px Consolas"
+                ctx.font = "12px Consolas"
                 ctx.fillText(Math.round(rangeNm * ring / 4), cx + 5, cy - radius * ring / 4 + 12)
             }
             for (let angle = 0; angle < Math.PI; angle += Math.PI / 6) {
@@ -96,7 +102,7 @@ Item {
             }
 
             ctx.fillStyle = "#7fa99d"
-            ctx.font = "11px Consolas"
+            ctx.font = "14px Consolas"
             ctx.fillText("N", cx - 4, cy - radius - 8)
 
             ctx.beginPath()
@@ -107,15 +113,48 @@ Item {
             ctx.fillStyle = phosphor
             ctx.fill()
 
-            ctx.strokeStyle = "#406d5d"
-            ctx.lineWidth = 1.5
-            ctx.beginPath()
-            boundaryPolyline.forEach((point, index) => {
-                const px = scope.mapX(point.x)
-                const py = scope.mapY(point.y)
-                if (index === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py)
-            })
-            ctx.stroke()
+            if (sectorBoundariesEnabled) {
+                ctx.strokeStyle = "#579b82"
+                ctx.lineWidth = 1.5
+                ctx.beginPath()
+                boundaryPolyline.forEach((point, index) => {
+                    const px = scope.mapX(point.x)
+                    const py = scope.mapY(point.y)
+                    if (index === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py)
+                })
+                ctx.stroke()
+            }
+
+            if (approachCorridorsEnabled) {
+                const corridors = [
+                    [{x: .18, y: .80}, {x: .48, y: .52}, {x: .79, y: .27}],
+                    [{x: .28, y: .18}, {x: .53, y: .48}, {x: .83, y: .72}]
+                ]
+                ctx.setLineDash([10, 5])
+                ctx.lineWidth = 4
+                ctx.strokeStyle = "rgba(115,217,255,.55)"
+                corridors.forEach(corridor => {
+                    ctx.beginPath()
+                    corridor.forEach((point, index) => index === 0
+                        ? ctx.moveTo(scope.mapX(point.x), scope.mapY(point.y))
+                        : ctx.lineTo(scope.mapX(point.x), scope.mapY(point.y)))
+                    ctx.stroke()
+                })
+                ctx.setLineDash([])
+            }
+
+            if (geofencesEnabled) {
+                const geofences = [{x: .32, y: .44, radius: .075}, {x: .68, y: .62, radius: .06}]
+                ctx.fillStyle = "rgba(255,116,108,.10)"
+                ctx.strokeStyle = "rgba(255,116,108,.82)"
+                ctx.lineWidth = 1.5
+                geofences.forEach(geofence => {
+                    ctx.beginPath()
+                    ctx.arc(scope.mapX(geofence.x), scope.mapY(geofence.y), geofence.radius * w * scope.zoomScale, 0, Math.PI * 2)
+                    ctx.fill()
+                    ctx.stroke()
+                })
+            }
 
             if (routesEnabled) {
                 ctx.setLineDash([7, 7])
@@ -172,7 +211,7 @@ Item {
     }
 
     Repeater {
-        model: scope.flights
+        model: scope.airTaxis
 
         Item {
             id: trackMarker
@@ -187,8 +226,8 @@ Item {
             required property bool alert
             x: scope.mapX(positionX) - 7
             y: scope.mapY(positionY) - 7
-            width: 122
-            height: 52
+            width: 142
+            height: 58
             scale: markerHover.hovered || index === scope.selectedTrack ? 1.04 : 1
             z: index === scope.selectedTrack ? 3 : (markerHover.hovered ? 2 : 1)
 
@@ -225,8 +264,8 @@ Item {
             Rectangle {
                 x: 19
                 y: 0
-                width: 96
-                height: 36
+                width: 116
+                height: 42
                 color: trackMarker.index === scope.selectedTrack ? "#163b31" : "#091713"
                 border.color: trackMarker.alert ? "#ffb443" : (trackMarker.index === scope.selectedTrack ? scope.phosphor : "#346a59")
                 border.width: 1
@@ -237,7 +276,7 @@ Item {
                     text: trackMarker.callSign + "  " + trackMarker.level + "\n" + trackMarker.speed + "KT  " + (trackMarker.verticalRate > 0 ? "+" : "") + trackMarker.verticalRate
                     color: trackMarker.alert ? "#ffcc75" : (trackMarker.index === scope.selectedTrack ? "#ffffff" : scope.phosphor)
                     font.family: "Consolas"
-                    font.pixelSize: 10
+                    font.pixelSize: 12
                     lineHeight: 0.9
                 }
             }
@@ -268,18 +307,18 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 14
-        width: 152
-        height: 30
+        width: 194
+        height: 36
         color: "#d00a1714"
         border.color: "#2b4b43"
         radius: 3
 
         Text {
             anchors.centerIn: parent
-            text: scope.rangeNm + " NM  •  SCROLL TO RANGE"
+            text: scope.rangeNm + " NM  •  UAM NETWORK RANGE"
             color: (scope.atMinimumRange || scope.atMaximumRange) ? "#ffb443" : "#7f9690"
             font.family: "Consolas"
-            font.pixelSize: 9
+            font.pixelSize: 11
             font.bold: scope.atMinimumRange || scope.atMaximumRange
         }
     }

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "models/FlightFilterProxyModel.h"
-#include "models/FlightListModel.h"
+#include "models/AirTaxiFilterProxyModel.h"
+#include "models/AirTaxiListModel.h"
 
 #include <QObject>
 #include <QString>
@@ -12,14 +12,17 @@
 class AirTrafficViewModel final : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QAbstractItemModel *flights READ flights CONSTANT)
-    Q_PROPERTY(QAbstractItemModel *filteredFlights READ filteredFlights CONSTANT)
-    Q_PROPERTY(QString flightFilter READ flightFilter WRITE setFlightFilter NOTIFY flightFilterChanged)
-    Q_PROPERTY(int filteredFlightCount READ filteredFlightCount NOTIFY flightFilterChanged)
-    Q_PROPERTY(int flightCount READ flightCount CONSTANT)
+    Q_PROPERTY(QAbstractItemModel *airTaxis READ airTaxis CONSTANT)
+    Q_PROPERTY(QAbstractItemModel *filteredAirTaxis READ filteredAirTaxis CONSTANT)
+    Q_PROPERTY(QString airTaxiFilter READ airTaxiFilter WRITE setAirTaxiFilter NOTIFY airTaxiFilterChanged)
+    Q_PROPERTY(QString altitudeFilter READ altitudeFilter NOTIFY airTaxiFilterChanged)
+    Q_PROPERTY(QString phaseFilter READ phaseFilter NOTIFY airTaxiFilterChanged)
+    Q_PROPERTY(QString squawkFilter READ squawkFilter NOTIFY airTaxiFilterChanged)
+    Q_PROPERTY(int filteredAirTaxiCount READ filteredAirTaxiCount NOTIFY airTaxiFilterChanged)
+    Q_PROPERTY(int airTaxiCount READ airTaxiCount CONSTANT)
     Q_PROPERTY(int alertCount READ alertCount NOTIFY surveillanceChanged)
-    Q_PROPERTY(QVariantMap alertFlight READ alertFlight NOTIFY surveillanceChanged)
-    Q_PROPERTY(QVariantMap selectedFlight READ selectedFlight NOTIFY surveillanceChanged)
+    Q_PROPERTY(QVariantMap alertAirTaxi READ alertAirTaxi NOTIFY surveillanceChanged)
+    Q_PROPERTY(QVariantMap selectedAirTaxi READ selectedAirTaxi NOTIFY surveillanceChanged)
     Q_PROPERTY(int selectedTrack READ selectedTrack NOTIFY selectedTrackChanged)
     Q_PROPERTY(int selectedFilteredTrack READ selectedFilteredTrack NOTIFY selectedTrackChanged)
     Q_PROPERTY(int rangeNm READ rangeNm NOTIFY rangeNmChanged)
@@ -33,10 +36,10 @@ class AirTrafficViewModel final : public QObject
     Q_PROPERTY(bool operational READ operational CONSTANT)
     Q_PROPERTY(bool separationAlertActive READ separationAlertActive NOTIFY separationAlertActiveChanged)
     Q_PROPERTY(QVariantList operationalFacts READ operationalFacts NOTIFY surveillanceChanged)
-    Q_PROPERTY(QVariantMap activeRunway READ activeRunway CONSTANT)
+    Q_PROPERTY(QVariantMap activeVertiport READ activeVertiport CONSTANT)
     Q_PROPERTY(QVariantMap weatherSummary READ weatherSummary NOTIFY surveillanceChanged)
     Q_PROPERTY(QVariantList weatherMetrics READ weatherMetrics NOTIFY surveillanceChanged)
-    Q_PROPERTY(QVariantList selectedFlightMetrics READ selectedFlightMetrics NOTIFY surveillanceChanged)
+    Q_PROPERTY(QVariantList selectedAirTaxiMetrics READ selectedAirTaxiMetrics NOTIFY surveillanceChanged)
     Q_PROPERTY(QVariantList sectorLoads READ sectorLoads NOTIFY surveillanceChanged)
     Q_PROPERTY(QVariantMap datalinkStatus READ datalinkStatus NOTIFY surveillanceChanged)
     Q_PROPERTY(QVariantMap separationAlert READ separationAlert NOTIFY surveillanceChanged)
@@ -51,21 +54,28 @@ class AirTrafficViewModel final : public QObject
     Q_PROPERTY(QString lastUpdateTime READ lastUpdateTime NOTIFY surveillanceChanged)
     Q_PROPERTY(qreal viewCenterX READ viewCenterX NOTIFY viewportChanged)
     Q_PROPERTY(qreal viewCenterY READ viewCenterY NOTIFY viewportChanged)
-    Q_PROPERTY(QString utcTime READ utcTime NOTIFY utcClockChanged)
-    Q_PROPERTY(QString utcDate READ utcDate NOTIFY utcClockChanged)
+    Q_PROPERTY(QString istTime READ istTime NOTIFY clockChanged)
+    Q_PROPERTY(QString istDate READ istDate NOTIFY clockChanged)
 
 public:
     explicit AirTrafficViewModel(QObject *parent = nullptr);
 
-    QAbstractItemModel *flights();
-    QAbstractItemModel *filteredFlights();
-    QString flightFilter() const;
-    Q_INVOKABLE void setFlightFilter(const QString &filter);
-    int filteredFlightCount() const;
-    int flightCount() const;
+    QAbstractItemModel *airTaxis();
+    QAbstractItemModel *filteredAirTaxis();
+    QString airTaxiFilter() const;
+    Q_INVOKABLE void setAirTaxiFilter(const QString &filter);
+    QString altitudeFilter() const;
+    QString phaseFilter() const;
+    QString squawkFilter() const;
+    Q_INVOKABLE void setAltitudeFilter(const QString &filter);
+    Q_INVOKABLE void setPhaseFilter(const QString &filter);
+    Q_INVOKABLE void setSquawkFilter(const QString &filter);
+    Q_INVOKABLE void clearQuickFilters();
+    int filteredAirTaxiCount() const;
+    int airTaxiCount() const;
     int alertCount() const;
-    QVariantMap alertFlight() const;
-    QVariantMap selectedFlight() const;
+    QVariantMap alertAirTaxi() const;
+    QVariantMap selectedAirTaxi() const;
 
     int selectedTrack() const;
     int selectedFilteredTrack() const;
@@ -82,10 +92,10 @@ public:
     bool operational() const;
     bool separationAlertActive() const;
     QVariantList operationalFacts() const;
-    QVariantMap activeRunway() const;
+    QVariantMap activeVertiport() const;
     QVariantMap weatherSummary() const;
     QVariantList weatherMetrics() const;
-    QVariantList selectedFlightMetrics() const;
+    QVariantList selectedAirTaxiMetrics() const;
     QVariantList sectorLoads() const;
     QVariantMap datalinkStatus() const;
     QVariantMap separationAlert() const;
@@ -100,11 +110,12 @@ public:
     QString lastUpdateTime() const;
     qreal viewCenterX() const;
     qreal viewCenterY() const;
-    QString utcTime() const;
-    QString utcDate() const;
+    QString istTime() const;
+    QString istDate() const;
 
     Q_INVOKABLE void selectTrack(int sourceIndex);
     Q_INVOKABLE void selectFilteredTrack(int proxyIndex);
+    Q_INVOKABLE void focusFilteredTrack(int proxyIndex);
     Q_INVOKABLE void decreaseRange();
     Q_INVOKABLE void increaseRange();
     Q_INVOKABLE void changeRangeBySteps(int steps);
@@ -115,16 +126,17 @@ public:
     Q_INVOKABLE void toggleRoutes();
     Q_INVOKABLE void acknowledgeSeparationAlert();
     Q_INVOKABLE void advanceSurveillance();
+    void onSurveillanceUpdate();
 
 signals:
     void selectedTrackChanged();
-    void flightFilterChanged();
+    void airTaxiFilterChanged();
     void rangeNmChanged();
     void sweepEnabledChanged();
     void weatherEnabledChanged();
     void routesEnabledChanged();
     void separationAlertActiveChanged();
-    void utcClockChanged();
+    void clockChanged();
     void surveillanceChanged();
     void viewportChanged();
 
@@ -135,14 +147,17 @@ private:
     void setWeatherEnabled(bool enabled);
     void setRoutesEnabled(bool enabled);
 
-    FlightListModel m_flights;
-    FlightFilterProxyModel m_filteredFlights;
+    AirTaxiListModel m_airTaxis;
+    AirTaxiFilterProxyModel m_filteredAirTaxis;
     QTimer m_clockTimer;
     QTimer m_surveillanceTimer;
-    QString m_flightFilter;
+    QString m_airTaxiFilter;
+    QString m_altitudeFilter;
+    QString m_phaseFilter;
+    QString m_squawkFilter;
     QString m_currentAlertCallSign;
     int m_selectedTrack = 0;
-    int m_rangeNm = 80;
+    int m_rangeNm = 20;
     int m_surveillanceTick = 0;
     qreal m_viewCenterX = .5;
     qreal m_viewCenterY = .51;

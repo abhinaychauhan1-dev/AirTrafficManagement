@@ -11,6 +11,8 @@
 
 #include <algorithm>
 #include <utility>
+#include <cstddef> // For std::size_t
+#include <cstdint> // For std::uint16_t, std::uint64_t
 
 namespace {
 

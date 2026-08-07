@@ -1,10 +1,12 @@
 #pragma once
 
+#include "face/contracts/v1/Surveillance.h"
+
 #include <QAbstractListModel>
 #include <QList>
 #include <QString>
 
-class FlightListModel final : public QAbstractListModel
+class AirTaxiListModel final : public QAbstractListModel
 {
     Q_OBJECT
 
@@ -21,25 +23,27 @@ public:
         PositionYRole,
         AlertRole,
         HeadingRole,
-        AircraftTypeRole,
+        VehicleTypeRole,
         VerticalRateRole,
+        BatteryRole,
         StatusLabelRole,
         SeverityRole
     };
     Q_ENUM(Role)
 
-    explicit FlightListModel(QObject *parent = nullptr);
+    explicit AirTaxiListModel(QObject *parent = nullptr);
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
-    QVariantMap flightAt(int row) const;
-    QVariantMap alertFlight() const;
+    QVariantMap airTaxiAt(int row) const;
+    QVariantMap alertAirTaxi() const;
     int alertCount() const;
     bool advanceOneSecond(int tick);
+    void updateFromState(const atm::face::contracts::v1::SurveillanceState &state);
 
 private:
-    struct Flight {
+    struct AirTaxi {
         QString callSign;
         QString route;
         QString level;
@@ -51,9 +55,10 @@ private:
         qreal positionY;
         bool alert;
         int heading;
-        QString aircraftType;
+        QString vehicleType;
         int verticalRate;
+        int battery;
     };
 
-    QList<Flight> m_flights;
+    QList<AirTaxi> m_airTaxis;
 };

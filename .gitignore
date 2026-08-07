@@ -1,0 +1,30 @@
+# Qt Creator user state
+*.pro.user
+*.pro.user.*
+.qtcreator/
+
+# Out-of-source build artifacts
+build/
+cmake-build-*/
+
+# qmake and Qt generated files
+.qmake.stash
+Makefile
+Makefile.*
+moc_*
+qrc_*.cpp
+ui_*.h
+
+# Compiled output and runtime artifacts
+*.o
+*.obj
+*.exe
+*.dll
+*.a
+*.lib
+*.pdb
+*.ilk
+*.log
+*.dmp
+*.tmp
+*.cache

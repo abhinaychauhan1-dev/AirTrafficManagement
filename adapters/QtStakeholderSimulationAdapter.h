@@ -16,6 +16,12 @@ class QtStakeholderSimulationAdapter final : public QObject
     Q_PROPERTY(QVariantList slotRequests READ slotRequests NOTIFY slotRequestsChanged)
     Q_PROPERTY(QVariantList complianceZones READ complianceZones NOTIFY complianceZonesChanged)
     Q_PROPERTY(QVariantList activityLog READ activityLog NOTIFY activityLogChanged)
+    Q_PROPERTY(int activeMissionIndex READ activeMissionIndex WRITE setActiveMissionIndex NOTIFY activeMissionChanged)
+    Q_PROPERTY(QVariantMap activeMission READ activeMission NOTIFY activeMissionChanged)
+    Q_PROPERTY(QVariantList activeMissionVertiports READ activeMissionVertiports NOTIFY activeMissionChanged)
+    Q_PROPERTY(QVariantList activeMissionSlots READ activeMissionSlots NOTIFY activeMissionChanged)
+    Q_PROPERTY(QVariantList activeMissionComplianceZones READ activeMissionComplianceZones NOTIFY activeMissionChanged)
+    Q_PROPERTY(QVariantList activeMissionActivity READ activeMissionActivity NOTIFY activeMissionChanged)
     Q_PROPERTY(QString simulationTime READ simulationTime NOTIFY simulationTimeChanged)
     Q_PROPERTY(bool running READ running WRITE setRunning NOTIFY runningChanged)
     Q_PROPERTY(bool mqttConnected READ mqttConnected NOTIFY transportChanged)
@@ -41,6 +47,13 @@ public:
     QVariantList slotRequests() const;
     QVariantList complianceZones() const;
     QVariantList activityLog() const;
+    int activeMissionIndex() const;
+    void setActiveMissionIndex(int index);
+    QVariantMap activeMission() const;
+    QVariantList activeMissionVertiports() const;
+    QVariantList activeMissionSlots() const;
+    QVariantList activeMissionComplianceZones() const;
+    QVariantList activeMissionActivity() const;
     QString simulationTime() const;
     bool running() const;
     void setRunning(bool running);
@@ -78,6 +91,7 @@ signals:
     void slotRequestsChanged();
     void complianceZonesChanged();
     void activityLogChanged();
+    void activeMissionChanged();
     void simulationTimeChanged();
     void runningChanged();
     void transportChanged();
@@ -95,6 +109,7 @@ private:
     QString m_brokerDescription;
     QString m_actionMessage;
     QString m_actionSeverity = QStringLiteral("info");
+    int m_activeMissionIndex = 0;
     bool m_running = true;
     bool m_mqttConnected = false;
 };
