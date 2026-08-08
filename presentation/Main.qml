@@ -523,7 +523,7 @@ ApplicationWindow {
             radius: 4
             clip: true
 
-            RadarDisplayView {
+            RadarScope {
                 id: radar
                 anchors.fill: parent
                 anchors.topMargin: 42

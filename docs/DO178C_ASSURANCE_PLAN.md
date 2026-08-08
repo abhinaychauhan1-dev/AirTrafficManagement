@@ -56,6 +56,14 @@ Any change to these assumptions requires an impact analysis and an update to thi
 | SWR-MIS-003 | A mission shall not consume a gate or charger repeatedly for the same active allocation. | `assignGate`, `startCharging` | Source review; Debug build |
 | SWR-COM-001 | Compliance enforcement shall affect only slots assigned to the enforced corridor. | `setBoundaryEnforcement`, `decideSlot` | Source review; Debug build |
 | SWR-UI-001 | Filter changes shall keep the selected surveillance track valid and visible when a matching track exists. | `AirTrafficViewModel::reconcileFilteredSelection` | Source review; Debug build |
+| SWR-INT-001 | Each operational intent shall retain a stable identity and monotonic revision across lifecycle mutations. | `SlotRequest`, `StakeholderSimulationComponent` | Source review; Debug build |
+| SWR-INT-002 | Intent acceptance shall reject invalid or conflicting corridor, time, and altitude volumes. | `isValidOperationalVolume`, `decideSlot` | Source review; Debug build |
+| SWR-INT-003 | Correlated transport events shall reject stale or duplicate entity revisions. | `MqttEventTransport::store` | Source review; Debug build |
+| SWR-INT-004 | The operator shall be shown intent identity, revision, lifecycle, volume, status, and conflict reason. | `QtStakeholderSimulationAdapter::slotRequests`, `MultiStakeholderView.qml` | Source review; QML lint |
+| SWR-SMS-001 | Each safety risk shall retain stable identity, revision, owner, mitigation, and bounded initial/residual assessment values. | `SafetyRisk`, `StakeholderSimulationComponent` | Source review; Debug build |
+| SWR-SMS-002 | A safety mitigation shall invoke its linked operational control before entering monitoring. | `StakeholderSimulationComponent::applySafetyMitigation` | Source review; Debug build |
+| SWR-SMS-003 | Mitigation withdrawal and verified recovery shall produce explicit reassessment or closure with correlated evidence. | `setBoundaryEnforcement`, `advance`, `publish` | Source review; Debug build |
+| SWR-SMS-004 | The operator shall be shown risk identity, status, owner, mitigation, and initial/residual classification. | `QtStakeholderSimulationAdapter::safetyRisks`, `MultiStakeholderView.qml` | Source review; QML lint |
 
 The bounds in SWR-SUR-002 and SWR-SUR-004 are derived requirements. They require confirmation against system capacity, sensor-interface, and airspace requirements before certification use.
 

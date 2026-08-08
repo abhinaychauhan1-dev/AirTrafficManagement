@@ -23,11 +23,8 @@ int main(int argc, char *argv[])
     MqttEventTransport eventTransport;
     atm::face::components::StakeholderSimulationComponent stakeholderSimulation(eventTransport);
     QtStakeholderSimulationAdapter stakeholderViewModel(stakeholderSimulation, eventTransport);
-    stakeholderViewModel.setBrokerDescription(eventTransport.brokerDescription());
     QObject::connect(&eventTransport, &MqttEventTransport::connectedChanged,
                      &stakeholderViewModel, &QtStakeholderSimulationAdapter::setMqttConnected);
-    QObject::connect(&eventTransport, &MqttEventTransport::eventsChanged,
-                     &stakeholderViewModel, &QtStakeholderSimulationAdapter::activityLogChanged);
     QObject::connect(&eventTransport, &MqttEventTransport::eventsChanged,
                      &stakeholderViewModel, &QtStakeholderSimulationAdapter::activeMissionChanged);
     QQmlApplicationEngine engine;

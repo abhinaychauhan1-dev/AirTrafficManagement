@@ -3,6 +3,7 @@
 #include "face/interfaces/IEventTransport.h"
 
 #include <QByteArray>
+#include <QHash>
 #include <QObject>
 #include <QTimer>
 
@@ -22,9 +23,6 @@ public:
     void publish(atm::face::v1::SimulationEvent event) override;
     const std::vector<atm::face::v1::SimulationEvent> &events() const override;
     void clear() override;
-
-    bool isConnected() const;
-    QString brokerDescription() const;
 
 signals:
     void connectedChanged(bool connected);
@@ -60,6 +58,7 @@ private:
     std::size_t m_capacity;
     std::uint64_t m_nextSequence = 1;
     std::vector<atm::face::v1::SimulationEvent> m_events;
+    QHash<QString, std::uint32_t> m_latestEntityVersions;
     bool m_useTls = false;
     bool m_connected = false;
 };

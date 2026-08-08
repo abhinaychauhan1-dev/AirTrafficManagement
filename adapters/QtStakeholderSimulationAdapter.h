@@ -12,22 +12,17 @@ class QtStakeholderSimulationAdapter final : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QVariantList missions READ missions NOTIFY missionsChanged)
-    Q_PROPERTY(QVariantList vertiports READ vertiports NOTIFY vertiportsChanged)
-    Q_PROPERTY(QVariantList slotRequests READ slotRequests NOTIFY slotRequestsChanged)
-    Q_PROPERTY(QVariantList complianceZones READ complianceZones NOTIFY complianceZonesChanged)
-    Q_PROPERTY(QVariantList activityLog READ activityLog NOTIFY activityLogChanged)
     Q_PROPERTY(int activeMissionIndex READ activeMissionIndex WRITE setActiveMissionIndex NOTIFY activeMissionChanged)
     Q_PROPERTY(QVariantMap activeMission READ activeMission NOTIFY activeMissionChanged)
     Q_PROPERTY(QVariantList activeMissionVertiports READ activeMissionVertiports NOTIFY activeMissionChanged)
     Q_PROPERTY(QVariantList activeMissionSlots READ activeMissionSlots NOTIFY activeMissionChanged)
     Q_PROPERTY(QVariantList activeMissionComplianceZones READ activeMissionComplianceZones NOTIFY activeMissionChanged)
+    Q_PROPERTY(QVariantList activeMissionSafetyRisks READ activeMissionSafetyRisks NOTIFY activeMissionChanged)
     Q_PROPERTY(QVariantList activeMissionActivity READ activeMissionActivity NOTIFY activeMissionChanged)
     Q_PROPERTY(QString simulationTime READ simulationTime NOTIFY simulationTimeChanged)
     Q_PROPERTY(bool running READ running WRITE setRunning NOTIFY runningChanged)
     Q_PROPERTY(bool mqttConnected READ mqttConnected NOTIFY transportChanged)
     Q_PROPERTY(QString transportMode READ transportMode NOTIFY transportChanged)
-    Q_PROPERTY(QString brokerDescription READ brokerDescription NOTIFY transportChanged)
-    Q_PROPERTY(QString transportStatusText READ transportStatusText NOTIFY transportChanged)
     Q_PROPERTY(QStringList stakeholderTabs READ stakeholderTabs CONSTANT)
     Q_PROPERTY(QStringList routeOptions READ routeOptions CONSTANT)
     Q_PROPERTY(QStringList missionProfiles READ missionProfiles CONSTANT)
@@ -43,24 +38,19 @@ public:
                                    QObject *parent = nullptr);
 
     QVariantList missions() const;
-    QVariantList vertiports() const;
-    QVariantList slotRequests() const;
-    QVariantList complianceZones() const;
-    QVariantList activityLog() const;
     int activeMissionIndex() const;
     void setActiveMissionIndex(int index);
     QVariantMap activeMission() const;
     QVariantList activeMissionVertiports() const;
     QVariantList activeMissionSlots() const;
     QVariantList activeMissionComplianceZones() const;
+    QVariantList activeMissionSafetyRisks() const;
     QVariantList activeMissionActivity() const;
     QString simulationTime() const;
     bool running() const;
     void setRunning(bool running);
     bool mqttConnected() const;
     QString transportMode() const;
-    QString brokerDescription() const;
-    QString transportStatusText() const;
     QStringList stakeholderTabs() const;
     QStringList routeOptions() const;
     QStringList missionProfiles() const;
@@ -69,7 +59,6 @@ public:
     bool manualStepEnabled() const;
     QString actionMessage() const;
     QString actionSeverity() const;
-    void setBrokerDescription(const QString &description);
 
 public slots:
     void setMqttConnected(bool connected);
@@ -81,16 +70,13 @@ public slots:
     Q_INVOKABLE void startCharging(int index);
     Q_INVOKABLE void decideSlot(int index, bool granted);
     Q_INVOKABLE void setBoundaryEnforcement(int index, bool enforced);
+    Q_INVOKABLE void applySafetyMitigation(int index);
     Q_INVOKABLE void advanceSimulation();
     Q_INVOKABLE void resetSimulation();
     Q_INVOKABLE void toggleRunning();
 
 signals:
     void missionsChanged();
-    void vertiportsChanged();
-    void slotRequestsChanged();
-    void complianceZonesChanged();
-    void activityLogChanged();
     void activeMissionChanged();
     void simulationTimeChanged();
     void runningChanged();
@@ -99,6 +85,11 @@ signals:
     void actionFeedbackChanged();
 
 private:
+    QVariantList vertiports() const;
+    QVariantList slotRequests() const;
+    QVariantList complianceZones() const;
+    QVariantList safetyRisks() const;
+    QVariantList activityLog() const;
     bool actionAllowed(const QString &action);
     void reportAction(const QString &message, bool success);
     void emitStateChanged();
@@ -106,7 +97,6 @@ private:
     atm::face::interfaces::IStakeholderSimulation &m_simulation;
     atm::face::interfaces::IEventTransport &m_transport;
     QTimer m_timer;
-    QString m_brokerDescription;
     QString m_actionMessage;
     QString m_actionSeverity = QStringLiteral("info");
     int m_activeMissionIndex = 0;

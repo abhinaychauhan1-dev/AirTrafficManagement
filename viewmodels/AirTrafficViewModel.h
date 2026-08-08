@@ -12,22 +12,14 @@
 class AirTrafficViewModel final : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QAbstractItemModel *airTaxis READ airTaxis CONSTANT)
     Q_PROPERTY(QAbstractItemModel *filteredAirTaxis READ filteredAirTaxis CONSTANT)
-    Q_PROPERTY(QString airTaxiFilter READ airTaxiFilter WRITE setAirTaxiFilter NOTIFY airTaxiFilterChanged)
-    Q_PROPERTY(QString altitudeFilter READ altitudeFilter NOTIFY airTaxiFilterChanged)
-    Q_PROPERTY(QString phaseFilter READ phaseFilter NOTIFY airTaxiFilterChanged)
-    Q_PROPERTY(QString squawkFilter READ squawkFilter NOTIFY airTaxiFilterChanged)
     Q_PROPERTY(int filteredAirTaxiCount READ filteredAirTaxiCount NOTIFY airTaxiFilterChanged)
     Q_PROPERTY(int airTaxiCount READ airTaxiCount CONSTANT)
     Q_PROPERTY(int alertCount READ alertCount NOTIFY surveillanceChanged)
     Q_PROPERTY(QVariantMap alertAirTaxi READ alertAirTaxi NOTIFY surveillanceChanged)
     Q_PROPERTY(QVariantMap selectedAirTaxi READ selectedAirTaxi NOTIFY surveillanceChanged)
-    Q_PROPERTY(int selectedTrack READ selectedTrack NOTIFY selectedTrackChanged)
     Q_PROPERTY(int selectedFilteredTrack READ selectedFilteredTrack NOTIFY selectedTrackChanged)
     Q_PROPERTY(int rangeNm READ rangeNm NOTIFY rangeNmChanged)
-    Q_PROPERTY(int minimumRangeNm READ minimumRangeNm CONSTANT)
-    Q_PROPERTY(int maximumRangeNm READ maximumRangeNm CONSTANT)
     Q_PROPERTY(bool atMinimumRange READ atMinimumRange NOTIFY rangeNmChanged)
     Q_PROPERTY(bool atMaximumRange READ atMaximumRange NOTIFY rangeNmChanged)
     Q_PROPERTY(bool sweepEnabled READ sweepEnabled NOTIFY sweepEnabledChanged)
@@ -51,7 +43,6 @@ class AirTrafficViewModel final : public QObject
     Q_PROPERTY(QString adsbCoverage READ adsbCoverage CONSTANT)
     Q_PROPERTY(QString controllerPosition READ controllerPosition CONSTANT)
     Q_PROPERTY(QString dataStatusText READ dataStatusText NOTIFY operationalChanged)
-    Q_PROPERTY(QString lastUpdateTime READ lastUpdateTime NOTIFY surveillanceChanged)
     Q_PROPERTY(qreal viewCenterX READ viewCenterX NOTIFY viewportChanged)
     Q_PROPERTY(qreal viewCenterY READ viewCenterY NOTIFY viewportChanged)
     Q_PROPERTY(QString istTime READ istTime NOTIFY clockChanged)
@@ -60,14 +51,9 @@ class AirTrafficViewModel final : public QObject
 public:
     explicit AirTrafficViewModel(QObject *parent = nullptr);
 
-    QAbstractItemModel *airTaxis();
     QAbstractItemModel *filteredAirTaxis();
     AirTaxiListModel &airTaxiListModel();
-    QString airTaxiFilter() const;
     Q_INVOKABLE void setAirTaxiFilter(const QString &filter);
-    QString altitudeFilter() const;
-    QString phaseFilter() const;
-    QString squawkFilter() const;
     Q_INVOKABLE void setAltitudeFilter(const QString &filter);
     Q_INVOKABLE void setPhaseFilter(const QString &filter);
     Q_INVOKABLE void setSquawkFilter(const QString &filter);
@@ -78,12 +64,9 @@ public:
     QVariantMap alertAirTaxi() const;
     QVariantMap selectedAirTaxi() const;
 
-    int selectedTrack() const;
     int selectedFilteredTrack() const;
 
     int rangeNm() const;
-    int minimumRangeNm() const;
-    int maximumRangeNm() const;
     bool atMinimumRange() const;
     bool atMaximumRange() const;
 
@@ -108,7 +91,6 @@ public:
     QString adsbCoverage() const;
     QString controllerPosition() const;
     QString dataStatusText() const;
-    QString lastUpdateTime() const;
     qreal viewCenterX() const;
     qreal viewCenterY() const;
     QString istTime() const;

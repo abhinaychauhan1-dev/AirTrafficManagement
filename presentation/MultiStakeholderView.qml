@@ -10,6 +10,7 @@ Item {
     property int selectedVertiport: 0
     property int selectedSlot: 0
     property int selectedZone: 0
+    property int selectedRisk: 0
     property int stakeholderIndex: 0
     readonly property var selectedMissionData: viewModel.activeMission
 
@@ -652,7 +653,7 @@ Item {
                             required property int index
                             required property var modelData
                             width: ListView.view.width
-                            height: 78
+                            height: 92
                             radius: 3
                             color: index === root.selectedVertiport ? "#142c31" : root.raised
                             border.color: modelData.severity === "warning" ? root.amber : (index === root.selectedVertiport ? root.cyan : root.line)
@@ -716,21 +717,27 @@ Item {
                                 anchors.margins: 8
                                 spacing: 14
                                 Column {
-                                    Layout.preferredWidth: 96
-                                    Text { text: modelData.requestId; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 12 }
+                                    Layout.preferredWidth: 150
+                                    Text { text: modelData.intentId + "  r" + modelData.revision; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 10 }
                                     Text { text: modelData.callSign; color: root.textMain; font.family: "Consolas"; font.pixelSize: 16; font.bold: true }
+                                    Text { text: modelData.lifecycle; color: modelData.severity === "warning" ? root.amber : root.cyan; font.family: "Consolas"; font.pixelSize: 10; font.bold: true }
                                 }
                                 Metric { label: "CORRIDOR"; value: modelData.corridor }
-                                Metric { label: "REQUEST"; value: modelData.desired }
+                                Metric { label: "4D WINDOW"; value: modelData.window }
+                                Metric { label: "ALTITUDE"; value: modelData.altitudeBand }
                                 Item { Layout.fillWidth: true }
-                                Text { text: modelData.status; color: modelData.severity === "warning" ? root.amber : root.green; font.family: "Consolas"; font.pixelSize: 11; font.bold: true }
+                                Column {
+                                    Layout.preferredWidth: 180
+                                    Text { width: parent.width; text: modelData.status; color: modelData.severity === "warning" ? root.amber : root.green; font.family: "Consolas"; font.pixelSize: 11; font.bold: true; horizontalAlignment: Text.AlignRight; elide: Text.ElideRight }
+                                    Text { width: parent.width; visible: modelData.conflictReason.length > 0; text: modelData.conflictReason; color: root.amber; font.family: "Consolas"; font.pixelSize: 9; horizontalAlignment: Text.AlignRight; elide: Text.ElideRight }
+                                }
                             }
                         }
                     }
                     RowLayout {
                         Layout.fillWidth: true
-                        ActionButton { text: "GRANT SLOT"; enabled: root.viewModel.localControlsEnabled && root.selectedSlot >= 0 && root.selectedSlot < root.viewModel.activeMissionSlots.length; onClicked: root.viewModel.decideSlot(root.viewModel.activeMissionSlots[root.selectedSlot].sourceIndex, true) }
-                        ActionButton { text: "DENY SLOT"; enabled: root.viewModel.localControlsEnabled && root.selectedSlot >= 0 && root.selectedSlot < root.viewModel.activeMissionSlots.length; accent: root.red; onClicked: root.viewModel.decideSlot(root.viewModel.activeMissionSlots[root.selectedSlot].sourceIndex, false) }
+                        ActionButton { text: "GRANT SLOT"; enabled: root.viewModel.localControlsEnabled && root.selectedSlot >= 0 && root.selectedSlot < root.viewModel.activeMissionSlots.length && root.viewModel.activeMissionSlots[root.selectedSlot].canDecide; onClicked: root.viewModel.decideSlot(root.viewModel.activeMissionSlots[root.selectedSlot].sourceIndex, true) }
+                        ActionButton { text: "DENY SLOT"; enabled: root.viewModel.localControlsEnabled && root.selectedSlot >= 0 && root.selectedSlot < root.viewModel.activeMissionSlots.length && root.viewModel.activeMissionSlots[root.selectedSlot].canDecide; accent: root.red; onClicked: root.viewModel.decideSlot(root.viewModel.activeMissionSlots[root.selectedSlot].sourceIndex, false) }
                         Item { Layout.fillWidth: true }
                         Text { text: root.viewModel.workflowNotes.slot; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
                     }
@@ -748,35 +755,67 @@ Item {
                     anchors.fill: parent
                     anchors.margins: 10
                     spacing: 7
-                    PanelTitle { title: "MISSION COMPLIANCE"; role: "CORRIDOR NOISE / BOUNDARY" }
-                    ListView {
+                    PanelTitle { title: "MISSION SAFETY AND COMPLIANCE"; role: "SMS RISK CONTROL / CORRIDOR BOUNDARY" }
+                    RowLayout {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        spacing: 4
-                        clip: true
-                        model: root.viewModel.activeMissionComplianceZones
-                        Text { anchors.centerIn: parent; visible: parent.count === 0; text: "NO COMPLIANCE ZONES"; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 12 }
-                        delegate: Rectangle {
-                            required property int index
-                            required property var modelData
-                            width: ListView.view.width
-                            height: 78
-                            radius: 3
-                            color: index === root.selectedZone ? "#2d2817" : root.raised
-                            border.color: modelData.severity === "warning" ? root.amber : (index === root.selectedZone ? root.cyan : root.line)
-                            MouseArea { anchors.fill: parent; onClicked: root.selectedZone = index }
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.margins: 8
-                                spacing: 14
+                        spacing: 7
+                        ListView {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            spacing: 4
+                            clip: true
+                            model: root.viewModel.activeMissionComplianceZones
+                            Text { anchors.centerIn: parent; visible: parent.count === 0; text: "NO COMPLIANCE ZONES"; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 12 }
+                            delegate: Rectangle {
+                                required property int index
+                                required property var modelData
+                                width: ListView.view.width
+                                height: 78
+                                radius: 3
+                                color: index === root.selectedZone ? "#2d2817" : root.raised
+                                border.color: modelData.severity === "warning" ? root.amber : (index === root.selectedZone ? root.cyan : root.line)
+                                MouseArea { anchors.fill: parent; onClicked: root.selectedZone = index }
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 8
+                                    spacing: 14
+                                    Column {
+                                        Layout.fillWidth: true
+                                        Text { text: modelData.name; color: root.textMain; font.family: "Consolas"; font.pixelSize: 14; font.bold: true }
+                                        Text { text: modelData.track + " / " + modelData.status; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 10 }
+                                    }
+                                    Metric { label: "OVERFLIGHTS"; value: modelData.current + "/" + modelData.cap }
+                                    Metric { label: "NOISE"; value: modelData.noise + " dBA" }
+                                }
+                            }
+                        }
+                        ListView {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            spacing: 4
+                            clip: true
+                            model: root.viewModel.activeMissionSafetyRisks
+                            Text { anchors.centerIn: parent; visible: parent.count === 0; text: "NO RECORDED SAFETY RISKS"; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 12 }
+                            delegate: Rectangle {
+                                required property int index
+                                required property var modelData
+                                width: ListView.view.width
+                                height: 96
+                                radius: 3
+                                color: index === root.selectedRisk ? "#2d2817" : root.raised
+                                border.color: modelData.severity === "warning" ? root.amber : root.line
+                                MouseArea { anchors.fill: parent; onClicked: root.selectedRisk = index }
                                 Column {
                                     Layout.fillWidth: true
-                                    Text { text: modelData.name; color: root.textMain; font.family: "Consolas"; font.pixelSize: 16; font.bold: true }
-                                    Text { text: modelData.track + "  /  " + modelData.status; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 12 }
+                                    anchors.fill: parent
+                                    anchors.margins: 8
+                                    spacing: 2
+                                    Text { width: parent.width; text: modelData.riskId + " r" + modelData.revision + " / " + modelData.status; color: modelData.severity === "warning" ? root.amber : root.green; font.family: "Consolas"; font.pixelSize: 10; font.bold: true; elide: Text.ElideRight }
+                                    Text { width: parent.width; text: modelData.hazard; color: root.textMain; font.family: "Consolas"; font.pixelSize: 12; font.bold: true; elide: Text.ElideRight }
+                                    Text { width: parent.width; text: "INITIAL " + modelData.initialRisk + "  /  RESIDUAL " + modelData.residualRisk; color: root.cyan; font.family: "Consolas"; font.pixelSize: 10; elide: Text.ElideRight }
+                                    Text { width: parent.width; text: modelData.owner + " / " + modelData.mitigation; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 9; elide: Text.ElideRight }
                                 }
-                                Metric { label: "OVERFLIGHTS"; value: modelData.current + "/" + modelData.cap }
-                                Metric { label: "NOISE"; value: modelData.noise + " dBA" }
-                                Rectangle { width: 7; height: 7; radius: 4; color: modelData.enforced ? root.green : root.textMuted }
                             }
                         }
                     }
@@ -784,6 +823,7 @@ Item {
                         Layout.fillWidth: true
                         ActionButton { text: "ENFORCE BOUNDARY"; enabled: root.viewModel.localControlsEnabled && root.selectedZone >= 0 && root.selectedZone < root.viewModel.activeMissionComplianceZones.length; accent: root.amber; onClicked: root.viewModel.setBoundaryEnforcement(root.viewModel.activeMissionComplianceZones[root.selectedZone].sourceIndex, true) }
                         ActionButton { text: "MONITOR ONLY"; enabled: root.viewModel.localControlsEnabled && root.selectedZone >= 0 && root.selectedZone < root.viewModel.activeMissionComplianceZones.length; accent: root.cyan; onClicked: root.viewModel.setBoundaryEnforcement(root.viewModel.activeMissionComplianceZones[root.selectedZone].sourceIndex, false) }
+                        ActionButton { text: "APPLY MITIGATION"; enabled: root.viewModel.localControlsEnabled && root.selectedRisk >= 0 && root.selectedRisk < root.viewModel.activeMissionSafetyRisks.length && root.viewModel.activeMissionSafetyRisks[root.selectedRisk].canMitigate; accent: root.green; onClicked: root.viewModel.applySafetyMitigation(root.viewModel.activeMissionSafetyRisks[root.selectedRisk].sourceIndex) }
                         Item { Layout.fillWidth: true }
                         Text { text: root.viewModel.workflowNotes.compliance; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
                     }
@@ -836,6 +876,7 @@ Item {
             root.selectedVertiport = 0
             root.selectedSlot = 0
             root.selectedZone = 0
+            root.selectedRisk = 0
         }
     }
 

@@ -2,7 +2,6 @@
     <qresource prefix="/qt/qml/AirTrafficManagement">
         <file>presentation/Main.qml</file>
         <file>presentation/RadarScope.qml</file>
-        <file alias="presentation/RadarDisplayView.qml">presentation/RadarScope.qml</file>
         <file>presentation/AirspaceManager.qml</file>
         <file>presentation/InteractiveComboBox.qml</file>
         <file>presentation/MultiStakeholderView.qml</file>

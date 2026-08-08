@@ -17,6 +17,7 @@ public:
     const std::vector<v1::Vertiport> &vertiports() const override;
     const std::vector<v1::SlotRequest> &slotRequests() const override;
     const std::vector<v1::ComplianceZone> &complianceZones() const override;
+    const std::vector<v1::SafetyRisk> &safetyRisks() const override;
     int simulationMinutes() const override;
 
     bool planMission(std::size_t index, const std::string &route, const std::string &profile) override;
@@ -26,11 +27,13 @@ public:
     bool startCharging(std::size_t index, const std::string &callSign) override;
     bool decideSlot(std::size_t index, bool granted) override;
     bool setBoundaryEnforcement(std::size_t index, bool enforced) override;
+    bool applySafetyMitigation(std::size_t index) override;
     void advance() override;
     void reset() override;
 
 private:
-    void publish(v1::Stakeholder source, const std::string &message);
+    void publish(v1::Stakeholder source, const std::string &message,
+                 const std::string &correlationId = {}, std::uint32_t entityVersion = 0);
     void updateMissionStatus(const std::string &callSign, const std::string &status);
 
     interfaces::IEventTransport &m_transport;
@@ -38,6 +41,7 @@ private:
     std::vector<v1::Vertiport> m_vertiports;
     std::vector<v1::SlotRequest> m_slotRequests;
     std::vector<v1::ComplianceZone> m_complianceZones;
+    std::vector<v1::SafetyRisk> m_safetyRisks;
     int m_minutes = 8 * 60 + 15;
 };
 

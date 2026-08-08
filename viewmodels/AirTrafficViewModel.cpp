@@ -29,11 +29,6 @@ AirTrafficViewModel::AirTrafficViewModel(QObject *parent)
     m_currentAlertCallSign = alertAirTaxi().value(QStringLiteral("callSign")).toString();
 }
 
-QAbstractItemModel *AirTrafficViewModel::airTaxis()
-{
-    return &m_airTaxis;
-}
-
 QAbstractItemModel *AirTrafficViewModel::filteredAirTaxis()
 {
     return &m_filteredAirTaxis;
@@ -42,11 +37,6 @@ QAbstractItemModel *AirTrafficViewModel::filteredAirTaxis()
 AirTaxiListModel &AirTrafficViewModel::airTaxiListModel()
 {
     return m_airTaxis;
-}
-
-QString AirTrafficViewModel::airTaxiFilter() const
-{
-    return m_airTaxiFilter;
 }
 
 void AirTrafficViewModel::setAirTaxiFilter(const QString &filter)
@@ -58,10 +48,6 @@ void AirTrafficViewModel::setAirTaxiFilter(const QString &filter)
     reconcileFilteredSelection();
     emit airTaxiFilterChanged();
 }
-
-QString AirTrafficViewModel::altitudeFilter() const { return m_altitudeFilter; }
-QString AirTrafficViewModel::phaseFilter() const { return m_phaseFilter; }
-QString AirTrafficViewModel::squawkFilter() const { return m_squawkFilter; }
 
 void AirTrafficViewModel::setAltitudeFilter(const QString &filter)
 {
@@ -125,11 +111,6 @@ QVariantMap AirTrafficViewModel::selectedAirTaxi() const
     return m_airTaxis.airTaxiAt(m_selectedTrack);
 }
 
-int AirTrafficViewModel::selectedTrack() const
-{
-    return m_selectedTrack;
-}
-
 int AirTrafficViewModel::selectedFilteredTrack() const
 {
     return m_filteredAirTaxis.proxyRowForSourceRow(m_selectedTrack);
@@ -167,8 +148,6 @@ void AirTrafficViewModel::setRangeNm(int rangeNm)
     emit rangeNmChanged();
 }
 
-int AirTrafficViewModel::minimumRangeNm() const { return kMinimumRangeNm; }
-int AirTrafficViewModel::maximumRangeNm() const { return kMaximumRangeNm; }
 bool AirTrafficViewModel::atMinimumRange() const { return m_rangeNm == kMinimumRangeNm; }
 bool AirTrafficViewModel::atMaximumRange() const { return m_rangeNm == kMaximumRangeNm; }
 
@@ -338,7 +317,6 @@ QString AirTrafficViewModel::dataStatusText() const
     return m_surveillanceInputValid ? QStringLiteral("LIVE AIR TAXI FEED")
                                     : QStringLiteral("INPUT REJECTED / LAST KNOWN GOOD");
 }
-QString AirTrafficViewModel::lastUpdateTime() const { return istTime(); }
 qreal AirTrafficViewModel::viewCenterX() const { return m_viewCenterX; }
 qreal AirTrafficViewModel::viewCenterY() const { return m_viewCenterY; }
 QString AirTrafficViewModel::istTime() const

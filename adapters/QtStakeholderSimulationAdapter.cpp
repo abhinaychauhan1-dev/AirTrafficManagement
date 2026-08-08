@@ -20,6 +20,48 @@ QString sourceName(atm::face::v1::Stakeholder source)
     return QStringLiteral("UNKNOWN");
 }
 
+QString operationalIntentStateName(atm::face::v1::OperationalIntentState state)
+{
+    using State = atm::face::v1::OperationalIntentState;
+    switch (state) {
+    case State::Draft: return QStringLiteral("DRAFT");
+    case State::Submitted: return QStringLiteral("SUBMITTED");
+    case State::Accepted: return QStringLiteral("ACCEPTED");
+    case State::Activated: return QStringLiteral("ACTIVATED");
+    case State::Closed: return QStringLiteral("CLOSED");
+    case State::Nonconforming: return QStringLiteral("NONCONFORMING");
+    case State::Contingent: return QStringLiteral("CONTINGENT");
+    case State::Rejected: return QStringLiteral("REJECTED");
+    case State::Conflict: return QStringLiteral("CONFLICT");
+    }
+    return QStringLiteral("UNKNOWN");
+}
+
+QString minuteOfDay(int minute)
+{
+    return QTime(minute / 60, minute % 60).toString(QStringLiteral("HH:mm"));
+}
+
+QString safetyRiskStatusName(atm::face::v1::SafetyRiskStatus status)
+{
+    using Status = atm::face::v1::SafetyRiskStatus;
+    switch (status) {
+    case Status::MitigationRequired: return QStringLiteral("MITIGATION REQUIRED");
+    case Status::Monitoring: return QStringLiteral("MONITORING");
+    case Status::Closed: return QStringLiteral("CLOSED");
+    }
+    return QStringLiteral("UNKNOWN");
+}
+
+QString localRiskBand(int score)
+{
+    if (score >= 15)
+        return QStringLiteral("HIGH");
+    if (score >= 8)
+        return QStringLiteral("MEDIUM");
+    return QStringLiteral("LOW");
+}
+
 } // namespace
 
 QtStakeholderSimulationAdapter::QtStakeholderSimulationAdapter(
@@ -90,13 +132,25 @@ QVariantList QtStakeholderSimulationAdapter::slotRequests() const
     int sourceIndex = 0;
     for (const atm::face::v1::SlotRequest &slot : m_simulation.slotRequests()) {
         const QString status = QString::fromStdString(slot.status);
-        const bool adverse = status == QStringLiteral("DENIED") || status == QStringLiteral("HELD - NOISE");
+        const bool canDecide = slot.state == atm::face::v1::OperationalIntentState::Submitted
+            && m_simulation.simulationMinutes() < slot.endMinute;
+        const bool adverse = slot.state == atm::face::v1::OperationalIntentState::Rejected
+            || slot.state == atm::face::v1::OperationalIntentState::Conflict
+            || slot.state == atm::face::v1::OperationalIntentState::Nonconforming
+            || slot.state == atm::face::v1::OperationalIntentState::Contingent;
         result.append(QVariantMap{
             {QStringLiteral("requestId"), QString::fromStdString(slot.requestId)},
+            {QStringLiteral("intentId"), QString::fromStdString(slot.operationalIntentId)},
+            {QStringLiteral("revision"), slot.revision},
             {QStringLiteral("callSign"), QString::fromStdString(slot.callSign)},
             {QStringLiteral("corridor"), QString::fromStdString(slot.corridor)},
             {QStringLiteral("desired"), QString::fromStdString(slot.desiredTime)},
+            {QStringLiteral("window"), minuteOfDay(slot.startMinute) + QStringLiteral("-") + minuteOfDay(slot.endMinute)},
+            {QStringLiteral("altitudeBand"), QStringLiteral("%1-%2 FT").arg(slot.minimumAltitudeFt).arg(slot.maximumAltitudeFt)},
+            {QStringLiteral("lifecycle"), operationalIntentStateName(slot.state)},
             {QStringLiteral("status"), status},
+            {QStringLiteral("conflictReason"), QString::fromStdString(slot.conflictReason)},
+            {QStringLiteral("canDecide"), canDecide},
             {QStringLiteral("severity"), adverse ? QStringLiteral("warning") : QStringLiteral("normal")}
             , {QStringLiteral("sourceIndex"), sourceIndex++}
         });
@@ -126,15 +180,46 @@ QVariantList QtStakeholderSimulationAdapter::complianceZones() const
     return result;
 }
 
+QVariantList QtStakeholderSimulationAdapter::safetyRisks() const
+{
+    QVariantList result;
+    int sourceIndex = 0;
+    for (const atm::face::v1::SafetyRisk &risk : m_simulation.safetyRisks()) {
+        const int initialScore = risk.initialLikelihood * risk.initialSeverity;
+        const int residualScore = risk.residualLikelihood * risk.residualSeverity;
+        const bool closed = risk.status == atm::face::v1::SafetyRiskStatus::Closed;
+        result.append(QVariantMap{
+            {QStringLiteral("riskId"), QString::fromStdString(risk.riskId)},
+            {QStringLiteral("revision"), risk.revision},
+            {QStringLiteral("hazard"), QString::fromStdString(risk.hazard)},
+            {QStringLiteral("consequence"), QString::fromStdString(risk.consequence)},
+            {QStringLiteral("callSign"), QString::fromStdString(risk.linkedCallSign)},
+            {QStringLiteral("linkedEntity"), QString::fromStdString(risk.linkedEntity)},
+            {QStringLiteral("owner"), QString::fromStdString(risk.owner)},
+            {QStringLiteral("mitigation"), QString::fromStdString(risk.mitigation)},
+            {QStringLiteral("initialRisk"), QStringLiteral("%1 / %2").arg(initialScore).arg(localRiskBand(initialScore))},
+            {QStringLiteral("residualRisk"), QStringLiteral("%1 / %2").arg(residualScore).arg(localRiskBand(residualScore))},
+            {QStringLiteral("status"), safetyRiskStatusName(risk.status)},
+            {QStringLiteral("canMitigate"), !closed},
+            {QStringLiteral("severity"), closed ? QStringLiteral("normal") : QStringLiteral("warning")},
+            {QStringLiteral("sourceIndex"), sourceIndex++}
+        });
+    }
+    return result;
+}
+
 QVariantList QtStakeholderSimulationAdapter::activityLog() const
 {
     QVariantList result;
     for (const atm::face::v1::SimulationEvent &event : m_transport.events()) {
         const QTime time(event.simulationMinutes / 60, event.simulationMinutes % 60);
-        result.append(QStringLiteral("%1  %2  %3").arg(
+        const QString correlation = event.correlationId.empty() ? QString()
+            : QStringLiteral("  [%1 r%2]").arg(QString::fromStdString(event.correlationId))
+                                             .arg(event.entityVersion);
+        result.append(QStringLiteral("%1  %2  %3%4").arg(
             time.toString(QStringLiteral("HH:mm")),
             sourceName(event.source).leftJustified(8),
-            QString::fromStdString(event.message)));
+            QString::fromStdString(event.message), correlation));
     }
     return result;
 }
@@ -197,6 +282,17 @@ QVariantList QtStakeholderSimulationAdapter::activeMissionComplianceZones() cons
     return result;
 }
 
+QVariantList QtStakeholderSimulationAdapter::activeMissionSafetyRisks() const
+{
+    QVariantList result;
+    const QString callSign = activeMission().value(QStringLiteral("callSign")).toString();
+    for (const QVariant &entry : safetyRisks()) {
+        if (entry.toMap().value(QStringLiteral("callSign")).toString() == callSign)
+            result.append(entry);
+    }
+    return result;
+}
+
 QVariantList QtStakeholderSimulationAdapter::activeMissionActivity() const
 {
     QVariantList result;
@@ -241,13 +337,6 @@ QString QtStakeholderSimulationAdapter::transportMode() const
     return m_mqttConnected ? QStringLiteral("MQTT EVENT FEED") : QStringLiteral("LOCAL SIMULATION");
 }
 
-QString QtStakeholderSimulationAdapter::brokerDescription() const { return m_brokerDescription; }
-
-QString QtStakeholderSimulationAdapter::transportStatusText() const
-{
-    return m_mqttConnected ? m_brokerDescription : QStringLiteral("MQTT OFFLINE");
-}
-
 QStringList QtStakeholderSimulationAdapter::stakeholderTabs() const
 {
     return {QStringLiteral("MISSION"), QStringLiteral("VERTIPORTS"),
@@ -283,14 +372,6 @@ bool QtStakeholderSimulationAdapter::manualStepEnabled() const { return !m_runni
 QString QtStakeholderSimulationAdapter::actionMessage() const { return m_actionMessage; }
 
 QString QtStakeholderSimulationAdapter::actionSeverity() const { return m_actionSeverity; }
-
-void QtStakeholderSimulationAdapter::setBrokerDescription(const QString &description)
-{
-    if (m_brokerDescription == description)
-        return;
-    m_brokerDescription = description;
-    emit transportChanged();
-}
 
 void QtStakeholderSimulationAdapter::setMqttConnected(bool connected)
 {
@@ -393,6 +474,17 @@ void QtStakeholderSimulationAdapter::setBoundaryEnforcement(int index, bool enfo
                          : QStringLiteral("Select a compliance zone."), success);
 }
 
+void QtStakeholderSimulationAdapter::applySafetyMitigation(int index)
+{
+    if (!actionAllowed(QStringLiteral("Apply safety mitigation")))
+        return;
+    const bool success = index >= 0 && m_simulation.applySafetyMitigation(static_cast<std::size_t>(index));
+    if (success)
+        emitStateChanged();
+    reportAction(success ? QStringLiteral("Safety mitigation applied; residual risk is under monitoring.")
+                         : QStringLiteral("Select an open safety risk with an available mitigation."), success);
+}
+
 void QtStakeholderSimulationAdapter::advanceSimulation()
 {
     if (!actionAllowed(QStringLiteral("Step simulation")))
@@ -430,10 +522,6 @@ void QtStakeholderSimulationAdapter::reportAction(const QString &message, bool s
 void QtStakeholderSimulationAdapter::emitStateChanged()
 {
     emit missionsChanged();
-    emit vertiportsChanged();
-    emit slotRequestsChanged();
-    emit complianceZonesChanged();
-    emit activityLogChanged();
     emit activeMissionChanged();
 }
 

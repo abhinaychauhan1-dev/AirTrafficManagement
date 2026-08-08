@@ -93,17 +93,8 @@ const std::vector<atm::face::v1::SimulationEvent> &MqttEventTransport::events() 
 void MqttEventTransport::clear()
 {
     m_events.clear();
+    m_latestEntityVersions.clear();
     emit eventsChanged();
-}
-
-bool MqttEventTransport::isConnected() const
-{
-    return m_connected;
-}
-
-QString MqttEventTransport::brokerDescription() const
-{
-    return QStringLiteral("%1:%2").arg(m_host).arg(m_port);
 }
 
 void MqttEventTransport::connectToBroker()
@@ -167,6 +158,8 @@ void MqttEventTransport::sendPublish(const atm::face::v1::SimulationEvent &event
         {QStringLiteral("simulationMinutes"), event.simulationMinutes},
         {QStringLiteral("source"), static_cast<int>(event.source)},
         {QStringLiteral("message"), QString::fromStdString(event.message)},
+        {QStringLiteral("correlationId"), QString::fromStdString(event.correlationId)},
+        {QStringLiteral("entityVersion"), static_cast<qint64>(event.entityVersion)},
         {QStringLiteral("origin"), m_clientId}
     };
     QByteArray body = encodeString(m_topic.toUtf8());
@@ -271,7 +264,15 @@ void MqttEventTransport::processPacket(quint8 header, const QByteArray &body)
     event.simulationMinutes = payload.value(QStringLiteral("simulationMinutes")).toInt();
     event.source = static_cast<atm::face::v1::Stakeholder>(payload.value(QStringLiteral("source")).toInt());
     event.message = payload.value(QStringLiteral("message")).toString().toStdString();
-    if (event.schemaVersion != atm::face::v1::kSchemaVersion || event.message.empty())
+    event.correlationId = payload.value(QStringLiteral("correlationId")).toString().toStdString();
+    event.entityVersion = static_cast<std::uint32_t>(payload.value(QStringLiteral("entityVersion")).toInteger());
+    const int sourceValue = static_cast<int>(event.source);
+    if (event.schemaVersion != atm::face::v1::kSchemaVersion || event.sequence == 0
+        || event.simulationMinutes < 0 || event.simulationMinutes >= 24 * 60
+        || sourceValue < static_cast<int>(atm::face::v1::Stakeholder::System)
+        || sourceValue > static_cast<int>(atm::face::v1::Stakeholder::UrbanAuthority)
+        || event.message.empty() || event.message.size() > 256
+        || event.correlationId.size() > 64)
         return;
     m_nextSequence = std::max(m_nextSequence, event.sequence + 1);
     store(std::move(event));
@@ -287,6 +288,14 @@ void MqttEventTransport::setConnected(bool connected)
 
 void MqttEventTransport::store(atm::face::v1::SimulationEvent event)
 {
+    if (!event.correlationId.empty()) {
+        const QString correlationId = QString::fromStdString(event.correlationId);
+        const auto latestVersion = m_latestEntityVersions.constFind(correlationId);
+        if (event.entityVersion == 0
+            || (latestVersion != m_latestEntityVersions.cend() && event.entityVersion <= latestVersion.value()))
+            return;
+        m_latestEntityVersions.insert(correlationId, event.entityVersion);
+    }
     m_events.insert(m_events.begin(), std::move(event));
     if (m_events.size() > m_capacity)
         m_events.resize(m_capacity);

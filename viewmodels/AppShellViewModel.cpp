@@ -25,14 +25,6 @@ AppShellViewModel::AppShellViewModel(QObject *parent)
 {
 }
 
-QStringList AppShellViewModel::moduleLabels() const
-{
-    QStringList labels;
-    for (const QVariant &module : m_modules)
-        labels.append(module.toMap().value(QStringLiteral("label")).toString());
-    return labels;
-}
-
 QVariantList AppShellViewModel::modules() const { return m_modules; }
 
 int AppShellViewModel::selectedModuleIndex() const { return m_selectedModuleIndex; }
