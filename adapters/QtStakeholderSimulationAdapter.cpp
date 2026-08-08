@@ -188,6 +188,7 @@ QVariantList QtStakeholderSimulationAdapter::safetyRisks() const
         const int initialScore = risk.initialLikelihood * risk.initialSeverity;
         const int residualScore = risk.residualLikelihood * risk.residualSeverity;
         const bool closed = risk.status == atm::face::v1::SafetyRiskStatus::Closed;
+        const bool mitigationRequired = risk.status == atm::face::v1::SafetyRiskStatus::MitigationRequired;
         result.append(QVariantMap{
             {QStringLiteral("riskId"), QString::fromStdString(risk.riskId)},
             {QStringLiteral("revision"), risk.revision},
@@ -200,7 +201,7 @@ QVariantList QtStakeholderSimulationAdapter::safetyRisks() const
             {QStringLiteral("initialRisk"), QStringLiteral("%1 / %2").arg(initialScore).arg(localRiskBand(initialScore))},
             {QStringLiteral("residualRisk"), QStringLiteral("%1 / %2").arg(residualScore).arg(localRiskBand(residualScore))},
             {QStringLiteral("status"), safetyRiskStatusName(risk.status)},
-            {QStringLiteral("canMitigate"), !closed},
+            {QStringLiteral("canMitigate"), mitigationRequired},
             {QStringLiteral("severity"), closed ? QStringLiteral("normal") : QStringLiteral("warning")},
             {QStringLiteral("sourceIndex"), sourceIndex++}
         });

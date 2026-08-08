@@ -517,6 +517,11 @@ void StakeholderSimulationComponent::reset()
         {"CENTRAL NIGHT BUFFER", "C-BRAVO", 8, 5, 54, true, "COMPLIANT"}
     };
     m_safetyRisks = {
+        {"SR-003", 1, "CORRIDOR OPERATING NEAR CAPACITY",
+         "REDUCED CAPACITY MARGIN MAY REQUIRE FLOW RESTRICTION", "ATX201", "C-DELTA",
+         "UTM DUTY MANAGER", "MAINTAIN BOUNDARY ENFORCEMENT AND MONITOR OVERFLIGHT TREND",
+         3, 3, 1, 3, v1::SafetyRiskStatus::Monitoring,
+         v1::SafetyMitigationAction::EnforceBoundary},
         {"SR-001", 1, "VEHICLE HEALTH BELOW DISPATCH THRESHOLD",
          "REDUCED PROPULSION OR ENERGY MARGIN", "SKY114", "SKY114",
          "FLEET SAFETY MANAGER", "BLOCK DISPATCH UNTIL HEALTH IS AT LEAST 60 PERCENT",

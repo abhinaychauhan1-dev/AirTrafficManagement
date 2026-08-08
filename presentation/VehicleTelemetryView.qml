@@ -366,6 +366,7 @@ Item {
                             cellWidth: width / 4
                             cellHeight: height / 2
                             delegate: Item {
+                                required property int index
                                 required property string motor
                                 required property string position
                                 required property int rpm
@@ -385,14 +386,58 @@ Item {
                                         anchors.margins: 7
                                         spacing: 7
                                         Rectangle {
-                                            Layout.preferredWidth: 34
-                                            Layout.preferredHeight: 34
-                                            radius: 17
+                                            Layout.preferredWidth: 42
+                                            Layout.preferredHeight: 42
+                                            radius: 21
                                             color: "transparent"
                                             border.color: root.motorColor(status)
                                             border.width: 2
-                                            Text { anchors.centerIn: parent; text: motor; color: root.motorColor(status); font.family: "Consolas"; font.pixelSize: 11; font.bold: true }
-                                            RotationAnimation on rotation { from: 0; to: 360; duration: Math.max(420, 150000 / rpm); loops: Animation.Infinite; running: root.visible }
+                                            Item {
+                                                id: rotor
+                                                anchors.fill: parent
+                                                anchors.margins: 4
+                                                Repeater {
+                                                    model: 3
+                                                    Rectangle {
+                                                        required property int index
+                                                        x: rotor.width / 2
+                                                        y: rotor.height / 2 - height / 2
+                                                        width: rotor.width * 0.42
+                                                        height: 3
+                                                        radius: 1
+                                                        color: root.motorColor(status)
+                                                        transform: Rotation {
+                                                            origin.x: 0
+                                                            origin.y: 1.5
+                                                            angle: index * 120
+                                                        }
+                                                    }
+                                                }
+                                                Rectangle {
+                                                    anchors.horizontalCenter: parent.horizontalCenter
+                                                    anchors.top: parent.top
+                                                    width: 5
+                                                    height: 5
+                                                    radius: 2.5
+                                                    color: root.textMain
+                                                }
+                                                RotationAnimation on rotation {
+                                                    from: index % 2 === 0 ? 0 : 360
+                                                    to: index % 2 === 0 ? 360 : 0
+                                                    duration: Math.max(760, 2600000 / rpm)
+                                                    loops: Animation.Infinite
+                                                    running: root.visible
+                                                }
+                                            }
+                                            Rectangle {
+                                                anchors.centerIn: parent
+                                                width: 22
+                                                height: 17
+                                                radius: 3
+                                                color: root.deep
+                                                border.color: root.line
+                                                Text { anchors.centerIn: parent; text: motor; color: root.motorColor(status); font.family: "Consolas"; font.pixelSize: 10; font.bold: true }
+                                            }
                                         }
                                         Column {
                                             Layout.fillWidth: true

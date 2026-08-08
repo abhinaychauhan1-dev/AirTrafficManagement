@@ -38,16 +38,6 @@ bool isValidSurveillanceState(const atm::face::contracts::v1::SurveillanceState 
 
 AirTaxiListModel::AirTaxiListModel(QObject *parent)
     : QAbstractListModel(parent)
-    , m_airTaxis{
-            {"ATX101", "SAKET V1 - IGI V2", "1200 FT", "LEVEL", "4521", "EN ROUTE", 96, 0.64, 0.30, false, 284, "JOBY S4", 0, 78},
-            {"SKY204", "NOIDA V3 - CP V4", "1800 FT", "DESC", "3164", "APPROACH", 82, 0.45, 0.40, false, 271, "ARCHER M", -320, 64},
-            {"BLU307", "GURUGRAM V5 - IGI V2", "2200 FT", "LEVEL", "7702", "CONFLICT", 104, 0.37, 0.59, true, 36, "VOLOCITY", 0, 51},
-            {"UAM412", "ROHINI V6 - AERO V7", "900 FT", "CLIMB", "5210", "DEPARTURE", 74, 0.57, 0.67, false, 318, "LILIUM JET", 280, 91},
-            {"ECO518", "CP V4 - NOIDA V3", "2600 FT", "LEVEL", "6427", "EN ROUTE", 112, 0.76, 0.53, false, 112, "EVE AIR", 0, 73},
-            {"ATX623", "IGI V2 - SAKET V1", "700 FT", "DESC", "2254", "APPROACH", 68, 0.24, 0.35, false, 61, "JOBY S4", -260, 42},
-            {"SKY731", "AERO V7 - ROHINI V6", "1500 FT", "LEVEL", "1372", "EN ROUTE", 88, 0.52, 0.20, false, 297, "ARCHER M", 0, 69},
-            {"MED805", "AIIMS V8 - IGI V2", "2400 FT", "CLIMB", "4615", "PRIORITY", 118, 0.70, 0.76, false, 84, "VOLOCITY", 340, 86},
-      }
 {
 }
 

@@ -463,7 +463,7 @@ Item {
 
                         Rectangle {
                             id: routeFlow
-                            Layout.preferredWidth: Math.min(280, root.width * 0.27)
+                            Layout.preferredWidth: Math.min(330, root.width * 0.29)
                             Layout.fillHeight: true
                             color: "#091412"
                             border.color: root.line
@@ -471,35 +471,155 @@ Item {
                             clip: true
 
                             readonly property var endpoints: String(root.selectedMissionData.route || "-- - --").split(" - ")
-                            property real flowProgress: 0
+                            readonly property var currentSlot: root.viewModel.activeMissionSlots.length > 0
+                                                               ? root.viewModel.activeMissionSlots[0] : ({})
+                            readonly property string lifecycle: String(currentSlot.lifecycle || "UNASSIGNED")
+                            readonly property bool movementAuthorized: lifecycle === "ACTIVATED" || lifecycle === "CLOSED"
+                            readonly property real routeProgress: calculateProgress()
+                            readonly property color stateColor: lifecycle === "ACTIVATED" ? root.green
+                                                               : (lifecycle === "CLOSED" ? root.cyan
+                                                               : (currentSlot.severity === "warning" ? root.amber : root.textMuted))
 
-                            Text { anchors.top: parent.top; anchors.left: parent.left; anchors.margins: 10; text: "LIVE ROUTE FLOW"; color: root.textMain; font.family: "Consolas"; font.pixelSize: 12; font.bold: true }
-                            Rectangle { x: 25; y: parent.height * 0.57; width: parent.width - 50; height: 2; color: root.line }
-                            Rectangle { x: 20; y: parent.height * 0.57 - 4; width: 10; height: 10; radius: 5; color: root.cyan }
-                            Rectangle { x: parent.width - 30; y: parent.height * 0.57 - 4; width: 10; height: 10; radius: 5; color: root.green }
-                            Rectangle {
-                                x: 25 + (routeFlow.width - 56) * routeFlow.flowProgress
-                                y: routeFlow.height * 0.57 - 5
-                                width: 12
-                                height: 12
-                                radius: 6
-                                color: root.green
-                                border.color: root.textMain
-                                SequentialAnimation on scale {
-                                    running: root.viewModel.running
-                                    loops: Animation.Infinite
-                                    NumberAnimation { to: 1.35; duration: 450 }
-                                    NumberAnimation { to: 1; duration: 450 }
-                                }
+                            function minuteOfDay(time) {
+                                const parts = String(time).split(":")
+                                return parts.length === 2 ? Number(parts[0]) * 60 + Number(parts[1]) : -1
                             }
-                            Text { x: 10; y: parent.height * 0.7; width: parent.width * 0.45; text: routeFlow.endpoints[0] || "--"; color: root.cyan; font.family: "Consolas"; font.pixelSize: 11; elide: Text.ElideRight }
-                            Text { x: parent.width * 0.52; y: parent.height * 0.7; width: parent.width * 0.44 - 10; text: routeFlow.endpoints[1] || "--"; color: root.green; font.family: "Consolas"; font.pixelSize: 11; horizontalAlignment: Text.AlignRight; elide: Text.ElideRight }
 
-                            SequentialAnimation on flowProgress {
-                                running: root.viewModel.running
-                                loops: Animation.Infinite
-                                NumberAnimation { from: 0; to: 1; duration: 2800; easing.type: Easing.InOutSine }
-                                PauseAnimation { duration: 200 }
+                            function calculateProgress() {
+                                if (lifecycle === "CLOSED")
+                                    return 1
+                                if (lifecycle !== "ACTIVATED")
+                                    return 0
+                                const bounds = String(currentSlot.window || "").split("-")
+                                const start = bounds.length === 2 ? minuteOfDay(bounds[0]) : -1
+                                const end = bounds.length === 2 ? minuteOfDay(bounds[1]) : -1
+                                const current = minuteOfDay(root.viewModel.simulationTime)
+                                if (start < 0 || end <= start || current < 0)
+                                    return 0
+                                return Math.max(0, Math.min(1, (current - start) / (end - start)))
+                            }
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 10
+                                spacing: 6
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Text { text: "LIVE ROUTE FLOW"; color: root.textMain; font.family: "Consolas"; font.pixelSize: 12; font.bold: true }
+                                    Item { Layout.fillWidth: true }
+                                    Text { text: routeFlow.lifecycle; color: routeFlow.stateColor; font.family: "Consolas"; font.pixelSize: 9; font.bold: true }
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Text { Layout.fillWidth: true; text: routeFlow.currentSlot.corridor || "NO CORRIDOR"; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 9; elide: Text.ElideRight }
+                                    Text { text: routeFlow.currentSlot.window || "--:-- - --:--"; color: root.cyan; font.family: "Consolas"; font.pixelSize: 9 }
+                                }
+
+                                Item {
+                                    id: routeTrack
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    Layout.minimumHeight: 46
+
+                                    Rectangle {
+                                        id: routeBaseline
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        anchors.leftMargin: 8
+                                        anchors.rightMargin: 8
+                                        height: 4
+                                        radius: 2
+                                        color: root.line
+                                        Rectangle {
+                                            width: parent.width * routeFlow.routeProgress
+                                            height: parent.height
+                                            radius: 2
+                                            color: routeFlow.stateColor
+                                            Behavior on width { NumberAnimation { duration: 500; easing.type: Easing.OutCubic } }
+                                        }
+                                    }
+
+                                    Repeater {
+                                        model: 5
+                                        Text {
+                                            required property int index
+                                            x: routeBaseline.x + routeBaseline.width * (index + 0.5) / 5 - width / 2
+                                            anchors.verticalCenter: routeBaseline.verticalCenter
+                                            text: ">"
+                                            color: routeFlow.routeProgress >= (index + 0.5) / 5 ? routeFlow.stateColor : root.textMuted
+                                            font.family: "Consolas"
+                                            font.pixelSize: 11
+                                            font.bold: true
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        anchors.left: routeBaseline.left
+                                        anchors.verticalCenter: routeBaseline.verticalCenter
+                                        width: 12; height: 12; radius: 6
+                                        color: root.cyan
+                                        border.color: root.textMain
+                                    }
+                                    Rectangle {
+                                        anchors.right: routeBaseline.right
+                                        anchors.verticalCenter: routeBaseline.verticalCenter
+                                        width: 12; height: 12; radius: 6
+                                        color: root.green
+                                        border.color: root.textMain
+                                    }
+                                    Rectangle {
+                                        x: routeBaseline.x + (routeBaseline.width - width) * routeFlow.routeProgress
+                                        anchors.verticalCenter: routeBaseline.verticalCenter
+                                        visible: routeFlow.movementAuthorized
+                                        width: 24
+                                        height: 20
+                                        radius: 3
+                                        color: routeFlow.stateColor
+                                        border.color: root.textMain
+                                        Text { anchors.centerIn: parent; text: ">"; color: root.deep; font.family: "Consolas"; font.pixelSize: 13; font.bold: true }
+                                        Behavior on x { NumberAnimation { duration: 500; easing.type: Easing.OutCubic } }
+                                    }
+                                    Rectangle {
+                                        anchors.left: routeBaseline.left
+                                        anchors.leftMargin: -6
+                                        anchors.verticalCenter: routeBaseline.verticalCenter
+                                        visible: !routeFlow.movementAuthorized
+                                        width: 24
+                                        height: 20
+                                        radius: 3
+                                        color: routeFlow.stateColor
+                                        border.color: root.textMain
+                                        Text { anchors.centerIn: parent; text: "!"; color: root.deep; font.family: "Consolas"; font.pixelSize: 13; font.bold: true }
+                                    }
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Column {
+                                        Layout.fillWidth: true
+                                        Layout.minimumWidth: 92
+                                        Text { text: "ORIGIN"; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 8 }
+                                        Text { width: parent.width; text: routeFlow.endpoints[0] || "--"; color: root.cyan; font.family: "Consolas"; font.pixelSize: 10; font.bold: true; elide: Text.ElideRight }
+                                    }
+                                    Text {
+                                        Layout.preferredWidth: 54
+                                        text: routeFlow.movementAuthorized ? Math.round(routeFlow.routeProgress * 100) + "%" : "HOLD"
+                                        color: routeFlow.stateColor
+                                        font.family: "Consolas"
+                                        font.pixelSize: 12
+                                        font.bold: true
+                                        horizontalAlignment: Text.AlignHCenter
+                                    }
+                                    Column {
+                                        Layout.fillWidth: true
+                                        Layout.minimumWidth: 92
+                                        Text { width: parent.width; text: "DESTINATION"; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 8; horizontalAlignment: Text.AlignRight }
+                                        Text { width: parent.width; text: routeFlow.endpoints[1] || "--"; color: root.green; font.family: "Consolas"; font.pixelSize: 10; font.bold: true; horizontalAlignment: Text.AlignRight; elide: Text.ElideRight }
+                                    }
+                                }
                             }
                         }
                     }

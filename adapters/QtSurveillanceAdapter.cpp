@@ -9,6 +9,11 @@ QtSurveillanceAdapter::QtSurveillanceAdapter(atm::face::interfaces::ISurveillanc
     , m_airTaxiListModel(airTaxiListModel)
     , m_airTrafficViewModel(airTrafficViewModel)
 {
+    if (m_airTaxiListModel.updateFromState(m_surveillance.surveillanceState()))
+        m_airTrafficViewModel.onSurveillanceUpdate();
+    else
+        m_airTrafficViewModel.onSurveillanceInputRejected();
+
     m_timer.setInterval(1000);
     connect(&m_timer, &QTimer::timeout, this, &QtSurveillanceAdapter::onTick);
     m_timer.start();
