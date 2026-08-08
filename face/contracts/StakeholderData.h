@@ -58,6 +58,7 @@ struct Vertiport {
     std::string status;
     int chargingMinutes = 0;
     std::string chargingCallSign;
+    std::string turnaroundCallSign;
 };
 
 struct SlotRequest {

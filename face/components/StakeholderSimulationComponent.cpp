@@ -186,8 +186,9 @@ bool StakeholderSimulationComponent::assignGate(std::size_t index, const std::st
     const auto mission = std::find_if(m_missions.begin(), m_missions.end(), [&](const v1::Mission &candidate) {
         return candidate.callSign == callSign;
     });
-    if (mission == m_missions.end() || mission->status == "GATE ASSIGNED"
-        || mission->status == "CHARGING")
+    if (mission == m_missions.end() || mission->route.find(vertiport.name) == std::string::npos
+        || mission->status == "GATE ASSIGNED" || mission->status == "CHARGING"
+        || !vertiport.turnaroundCallSign.empty())
         return false;
     if (vertiport.freeGates == 0) {
         vertiport.status = "GATE WAITLIST";
@@ -198,6 +199,7 @@ bool StakeholderSimulationComponent::assignGate(std::size_t index, const std::st
         vertiport.passengerQueue = std::max(0, vertiport.passengerQueue - 8);
         vertiport.turnaroundMinutes = 18;
         vertiport.status = "TURNAROUND";
+        vertiport.turnaroundCallSign = callSign;
         updateMissionStatus(callSign, "GATE ASSIGNED");
         publish(v1::Stakeholder::VertiportOperator, callSign + " assigned gate at " + vertiport.name + "; loading started");
     }
@@ -212,11 +214,12 @@ bool StakeholderSimulationComponent::startCharging(std::size_t index, const std:
     const auto mission = std::find_if(m_missions.begin(), m_missions.end(), [&](const v1::Mission &candidate) {
         return candidate.callSign == callSign;
     });
-    if (mission == m_missions.end() || mission->status == "CHARGING"
-        || vertiport.chargingCallSign == callSign)
+    if (mission == m_missions.end() || vertiport.turnaroundCallSign != callSign
+        || !vertiport.chargingCallSign.empty()
+        || (mission->status != "GATE ASSIGNED" && mission->status != "CHARGER QUEUE"))
         return false;
     if (vertiport.freeChargers == 0) {
-        vertiport.status = "CHARGER QUEUE";
+        vertiport.status = "TURNAROUND / CHARGER QUEUE";
         updateMissionStatus(callSign, "CHARGER QUEUE");
         publish(v1::Stakeholder::VertiportOperator, callSign + " charger request queued at " + vertiport.name);
     } else {
@@ -302,6 +305,8 @@ bool StakeholderSimulationComponent::setBoundaryEnforcement(std::size_t index, b
     if (index >= m_complianceZones.size())
         return false;
     v1::ComplianceZone &zone = m_complianceZones[index];
+    if (zone.enforced == enforced)
+        return false;
     zone.enforced = enforced;
     const bool capReached = zone.currentOverflights >= zone.overflightCap;
     zone.status = enforced ? (capReached ? "CAP ENFORCED" : "BOUNDARY ACTIVE") : "MONITOR ONLY";
@@ -360,11 +365,14 @@ bool StakeholderSimulationComponent::setBoundaryEnforcement(std::size_t index, b
         ? " compliance boundary enforced" : " switched to monitor only"));
     for (v1::SafetyRisk &risk : m_safetyRisks) {
         if (risk.action != v1::SafetyMitigationAction::EnforceBoundary
-            || risk.linkedEntity != zone.track)
+            || risk.linkedEntity != zone.track || risk.status == v1::SafetyRiskStatus::Closed)
+            continue;
+        const v1::SafetyRiskStatus nextStatus = enforced ? v1::SafetyRiskStatus::Monitoring
+                                                         : v1::SafetyRiskStatus::MitigationRequired;
+        if (risk.status == nextStatus)
             continue;
         ++risk.revision;
-        risk.status = enforced ? v1::SafetyRiskStatus::Monitoring
-                               : v1::SafetyRiskStatus::MitigationRequired;
+        risk.status = nextStatus;
         publish(v1::Stakeholder::UrbanAuthority,
                 risk.riskId + (enforced ? " mitigation under assurance monitoring"
                                         : " mitigation withdrawn; reassessment required"),
@@ -378,7 +386,7 @@ bool StakeholderSimulationComponent::applySafetyMitigation(std::size_t index)
     if (index >= m_safetyRisks.size())
         return false;
     v1::SafetyRisk &risk = m_safetyRisks[index];
-    if (risk.status == v1::SafetyRiskStatus::Closed)
+    if (risk.status != v1::SafetyRiskStatus::MitigationRequired)
         return false;
 
     if (risk.action == v1::SafetyMitigationAction::BlockDispatch) {
@@ -401,8 +409,8 @@ bool StakeholderSimulationComponent::applySafetyMitigation(std::size_t index)
         if (zone == m_complianceZones.end())
             return false;
         const std::size_t zoneIndex = static_cast<std::size_t>(std::distance(m_complianceZones.begin(), zone));
-        if (!zone->enforced && !setBoundaryEnforcement(zoneIndex, true))
-            return false;
+        if (!zone->enforced)
+            return setBoundaryEnforcement(zoneIndex, true);
         risk.status = v1::SafetyRiskStatus::Monitoring;
     }
 
@@ -421,6 +429,7 @@ void StakeholderSimulationComponent::advance()
             ++slot.revision;
             slot.state = v1::OperationalIntentState::Activated;
             slot.status = "ACTIVE";
+            updateZoneOccupancy(slot.corridor, 1);
             updateMissionStatus(slot.callSign, "OPERATION ACTIVE");
             publish(v1::Stakeholder::System, slot.callSign + " operational intent activated",
                     slot.operationalIntentId, slot.revision);
@@ -429,39 +438,37 @@ void StakeholderSimulationComponent::advance()
             ++slot.revision;
             slot.state = v1::OperationalIntentState::Closed;
             slot.status = "CLOSED";
+            updateZoneOccupancy(slot.corridor, -1);
             updateMissionStatus(slot.callSign, "COMPLETED");
             publish(v1::Stakeholder::System, slot.callSign + " operational intent closed",
                     slot.operationalIntentId, slot.revision);
-            } else if ((slot.state == v1::OperationalIntentState::Draft
+        } else if ((slot.state == v1::OperationalIntentState::Draft
                     || slot.state == v1::OperationalIntentState::Submitted)
                    && m_minutes >= slot.endMinute) {
-                ++slot.revision;
-                slot.state = v1::OperationalIntentState::Rejected;
-                slot.status = "EXPIRED";
-                slot.conflictReason = "OPERATIONAL WINDOW ELAPSED";
-                updateMissionStatus(slot.callSign, "INTENT EXPIRED");
-                publish(v1::Stakeholder::System, slot.callSign + " operational intent expired without activation",
+            ++slot.revision;
+            slot.state = v1::OperationalIntentState::Rejected;
+            slot.status = "EXPIRED";
+            slot.conflictReason = "OPERATIONAL WINDOW ELAPSED";
+            updateMissionStatus(slot.callSign, "INTENT EXPIRED");
+            publish(v1::Stakeholder::System, slot.callSign + " operational intent expired without activation",
                     slot.operationalIntentId, slot.revision);
-            } else if (slot.state == v1::OperationalIntentState::Contingent
+        } else if (slot.state == v1::OperationalIntentState::Contingent
                    && m_minutes >= slot.endMinute) {
-                ++slot.revision;
-                slot.state = v1::OperationalIntentState::Closed;
-                slot.status = "CLOSED - CONTINGENCY";
-                updateMissionStatus(slot.callSign, "COMPLETED - REVIEW");
-                publish(v1::Stakeholder::System, slot.callSign + " contingent operation closed; review required",
+            ++slot.revision;
+            slot.state = v1::OperationalIntentState::Closed;
+            slot.status = "CLOSED - CONTINGENCY";
+            updateZoneOccupancy(slot.corridor, -1);
+            updateMissionStatus(slot.callSign, "COMPLETED - REVIEW");
+            publish(v1::Stakeholder::System, slot.callSign + " contingent operation closed; review required",
                     slot.operationalIntentId, slot.revision);
         }
     }
-    for (v1::Vertiport &vertiport : m_vertiports) {
-        if (vertiport.turnaroundMinutes > 0)
+    for (std::size_t index = 0; index < m_vertiports.size(); ++index) {
+        v1::Vertiport &vertiport = m_vertiports[index];
+        if (!vertiport.turnaroundCallSign.empty() && vertiport.turnaroundMinutes > 0)
             --vertiport.turnaroundMinutes;
-        if (vertiport.turnaroundMinutes == 0 && vertiport.freeGates < vertiport.gates) {
-            vertiport.freeGates = std::min(vertiport.gates, vertiport.freeGates + 1);
-            if (vertiport.chargingMinutes == 0)
-                vertiport.status = "AVAILABLE";
-        }
 
-        if (vertiport.chargingMinutes > 0)
+        if (!vertiport.chargingCallSign.empty() && vertiport.chargingMinutes > 0)
             --vertiport.chargingMinutes;
         if (vertiport.chargingMinutes == 0 && !vertiport.chargingCallSign.empty()) {
             const auto mission = std::find_if(m_missions.begin(), m_missions.end(), [&](const v1::Mission &candidate) {
@@ -486,7 +493,23 @@ void StakeholderSimulationComponent::advance()
             vertiport.freeChargers = std::min(vertiport.chargers, vertiport.freeChargers + 1);
             publish(v1::Stakeholder::VertiportOperator, vertiport.name + " charging complete for " + vertiport.chargingCallSign);
             vertiport.chargingCallSign.clear();
-            vertiport.status = vertiport.turnaroundMinutes > 0 ? "TURNAROUND" : "AVAILABLE";
+            vertiport.status = "TURNAROUND";
+        }
+
+        if (!vertiport.turnaroundCallSign.empty() && vertiport.turnaroundMinutes == 0
+            && vertiport.chargingCallSign.empty()) {
+            const std::string completedCallSign = vertiport.turnaroundCallSign;
+            vertiport.turnaroundCallSign.clear();
+            vertiport.freeGates = std::min(vertiport.gates, vertiport.freeGates + 1);
+            vertiport.status = "AVAILABLE";
+            const auto mission = std::find_if(m_missions.begin(), m_missions.end(), [&](const v1::Mission &candidate) {
+                return candidate.callSign == completedCallSign;
+            });
+            if (mission != m_missions.end() && (mission->status == "GATE ASSIGNED"
+                || mission->status == "CHARGER QUEUE"))
+                mission->status = "TURNAROUND COMPLETE";
+            publish(v1::Stakeholder::VertiportOperator,
+                    vertiport.name + " turnaround complete for " + completedCallSign);
         }
     }
 }
@@ -500,11 +523,11 @@ void StakeholderSimulationComponent::reset()
         {"URB308", "VPT-DILLI - VPT-IGI", "AIRPORT", "08:32", 73, "PLANNED"}
     };
     m_vertiports = {
-        {"VPT-IGI", 6, 2, 4, 1, 34, 12, "BUSY", 0, ""},
-        {"VPT-NOIDA", 4, 1, 3, 2, 18, 7, "AVAILABLE", 0, ""},
-        {"VPT-GGM", 5, 0, 3, 1, 27, 16, "SATURATED", 0, ""},
-        {"VPT-CP", 3, 2, 2, 1, 12, 8, "AVAILABLE", 0, ""},
-        {"VPT-DILLI", 4, 3, 2, 2, 16, 6, "AVAILABLE", 0, ""}
+        {"VPT-IGI", 6, 2, 4, 1, 34, 12, "BUSY", 0, "", "BASELINE-IGI"},
+        {"VPT-NOIDA", 4, 1, 3, 2, 18, 7, "BUSY", 0, "", "BASELINE-NOIDA"},
+        {"VPT-GGM", 5, 0, 3, 1, 27, 16, "SATURATED", 0, "", "BASELINE-GGM"},
+        {"VPT-CP", 3, 2, 2, 1, 12, 8, "BUSY", 0, "", "BASELINE-CP"},
+        {"VPT-DILLI", 4, 3, 2, 2, 16, 6, "BUSY", 0, "", "BASELINE-DILLI"}
     };
     m_slotRequests = {
         {"SL-1042", "OI-DEL-0001042", 1, "ATX201", "C-DELTA", "08:20", 500, 510, 800, 1400, v1::OperationalIntentState::Submitted, "PENDING", ""},
@@ -547,6 +570,20 @@ void StakeholderSimulationComponent::publish(v1::Stakeholder source, const std::
 {
     m_transport.publish({v1::kSchemaVersion, 0, m_minutes, source, message,
                          correlationId, entityVersion});
+}
+
+void StakeholderSimulationComponent::updateZoneOccupancy(const std::string &corridor, int delta)
+{
+    const auto zone = std::find_if(m_complianceZones.begin(), m_complianceZones.end(), [&](const v1::ComplianceZone &candidate) {
+        return candidate.track == corridor;
+    });
+    if (zone == m_complianceZones.end())
+        return;
+    zone->currentOverflights = std::max(0, zone->currentOverflights + delta);
+    if (zone->currentOverflights >= zone->overflightCap)
+        zone->status = zone->enforced ? "CAP ENFORCED" : "CAP REACHED";
+    else
+        zone->status = zone->enforced ? "BOUNDARY ACTIVE" : "MONITOR ONLY";
 }
 
 void StakeholderSimulationComponent::updateMissionStatus(const std::string &callSign, const std::string &status)

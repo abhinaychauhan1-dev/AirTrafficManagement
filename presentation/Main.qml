@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -103,9 +105,11 @@ ApplicationWindow {
                 Repeater {
                     model: airTrafficViewModel.operationalFacts
                     Column {
+                        id: operationalFact
+                        required property var modelData
                         spacing: 2
-                        Text { text: modelData.label; color: window.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
-                        Text { text: modelData.value; color: window.textMain; font.family: "Consolas"; font.pixelSize: 15; font.bold: true }
+                        Text { text: operationalFact.modelData.label; color: window.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
+                        Text { text: operationalFact.modelData.value; color: window.textMain; font.family: "Consolas"; font.pixelSize: 15; font.bold: true }
                     }
                 }
             }
@@ -181,9 +185,11 @@ ApplicationWindow {
 
                 Popup {
                     id: modulePopup
-                    x: 0
+                    x: Math.min(0, window.width
+                                - moduleSelector.mapToItem(window.contentItem, 0, 0).x
+                                - width - 16)
                     y: moduleSelector.height + 7
-                    width: 430
+                    width: Math.min(430, window.width - 32)
                     height: featureList.implicitHeight + topPadding + bottomPadding
                     padding: 8
                     focus: true
@@ -552,19 +558,27 @@ ApplicationWindow {
                 height: 42; color: "#0b1715"; border.color: window.line
                 RowLayout {
                     anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10; spacing: 6
-                    ToolButton { text: "-"; enabled: !airTrafficViewModel.atMinimumRange; Accessible.name: "Decrease radar range"; ToolTip.text: "Decrease radar range"; ToolTip.visible: hovered; onClicked: airTrafficViewModel.decreaseRange() }
+                    ToolButton { text: "-"; enabled: !airTrafficViewModel.atMaximumRange; Accessible.name: "Zoom out"; ToolTip.text: "Zoom out / increase radar range"; ToolTip.visible: hovered; onClicked: airTrafficViewModel.increaseRange() }
                     Rectangle {
                         width: 64; height: 32; color: window.panelRaised; border.color: window.line; radius: 3
                         Text { anchors.centerIn: parent; text: airTrafficViewModel.rangeNm + " NM"; color: window.textMain; font.family: "Consolas"; font.pixelSize: 13 }
                     }
-                    ToolButton { text: "+"; enabled: !airTrafficViewModel.atMaximumRange; Accessible.name: "Increase radar range"; ToolTip.text: "Increase radar range"; ToolTip.visible: hovered; onClicked: airTrafficViewModel.increaseRange() }
+                    ToolButton { text: "+"; enabled: !airTrafficViewModel.atMinimumRange; Accessible.name: "Zoom in"; ToolTip.text: "Zoom in / decrease radar range"; ToolTip.visible: hovered; onClicked: airTrafficViewModel.decreaseRange() }
                     ToolButton { text: "CTR"; implicitWidth: 42; Accessible.name: "Reset radar view"; ToolTip.text: "Reset radar center and range"; ToolTip.visible: hovered; onClicked: airTrafficViewModel.resetRadarView() }
                     Rectangle { width: 1; height: 24; color: window.line }
                     ToolButton { text: "WX"; checkable: true; checked: airTrafficViewModel.weatherEnabled; ToolTip.text: "Weather overlay"; ToolTip.visible: hovered; onClicked: airTrafficViewModel.toggleWeather(); implicitWidth: 44 }
                     ToolButton { text: "COR"; checkable: true; checked: airTrafficViewModel.routesEnabled; ToolTip.text: "UAM corridors"; ToolTip.visible: hovered; onClicked: airTrafficViewModel.toggleRoutes(); implicitWidth: 44 }
                     ToolButton { text: airTrafficViewModel.sweepEnabled ? "II" : ">"; ToolTip.text: airTrafficViewModel.sweepEnabled ? "Pause sweep" : "Resume sweep"; ToolTip.visible: hovered; onClicked: airTrafficViewModel.toggleSweep() }
                     Item { Layout.fillWidth: true }
-                    Text { text: airTrafficViewModel.selectedAirTaxi.callSign + "  " + airTrafficViewModel.selectedAirTaxi.level; color: window.textMain; font.family: "Consolas"; font.pixelSize: 12; font.bold: true }
+                    Text {
+                        text: airTrafficViewModel.selectedAirTaxi.callSign
+                              ? airTrafficViewModel.selectedAirTaxi.callSign + "  " + airTrafficViewModel.selectedAirTaxi.level
+                              : "NO TRACK SELECTED"
+                        color: window.textMain
+                        font.family: "Consolas"
+                        font.pixelSize: 12
+                        font.bold: true
+                    }
                     Rectangle { width: 1; height: 24; color: window.line }
                     Row {
                         spacing: 7
@@ -672,16 +686,18 @@ ApplicationWindow {
                             Item { Layout.fillWidth: true }
                             StatusDot { statusColor: airTrafficViewModel.selectedAirTaxi.alert ? window.amber : window.green }
                         }
-                        Text { text: airTrafficViewModel.selectedAirTaxi.callSign; color: window.textMain; font.family: "Consolas"; font.pixelSize: 28; font.bold: true }
-                        Text { text: airTrafficViewModel.selectedAirTaxi.route; color: window.cyan; font.family: "Consolas"; font.pixelSize: 13 }
+                        Text { text: airTrafficViewModel.selectedAirTaxi.callSign || "---"; color: window.textMain; font.family: "Consolas"; font.pixelSize: 28; font.bold: true }
+                        Text { text: airTrafficViewModel.selectedAirTaxi.route || "NO SURVEILLANCE TRACK SELECTED"; color: window.cyan; font.family: "Consolas"; font.pixelSize: 13 }
                         Rectangle { Layout.fillWidth: true; height: 1; color: window.line }
                         GridLayout {
                             Layout.fillWidth: true; columns: 2; columnSpacing: 22; rowSpacing: 14
                             Repeater {
                                 model: airTrafficViewModel.selectedAirTaxiMetrics
                                 Column {
-                                    Text { text: modelData.label; color: window.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
-                                    Text { text: modelData.value; color: window.textMain; font.family: "Consolas"; font.pixelSize: 14; font.bold: true }
+                                    id: selectedMetric
+                                    required property var modelData
+                                    Text { text: selectedMetric.modelData.label; color: window.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
+                                    Text { text: selectedMetric.modelData.value; color: window.textMain; font.family: "Consolas"; font.pixelSize: 14; font.bold: true }
                                 }
                             }
                         }
@@ -709,12 +725,14 @@ ApplicationWindow {
                             Repeater {
                                 model: airTrafficViewModel.weatherMetrics
                                 Column {
-                                    Text { text: modelData.label; color: window.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
-                                    Text { text: modelData.value; color: window.textMain; font.family: "Consolas"; font.pixelSize: 13; font.bold: true }
+                                    id: weatherMetric
+                                    required property var modelData
+                                    Text { text: weatherMetric.modelData.label; color: window.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
+                                    Text { text: weatherMetric.modelData.value; color: window.textMain; font.family: "Consolas"; font.pixelSize: 13; font.bold: true }
                                 }
                             }
                         }
-                        Text { text: airTrafficViewModel.weatherSummary.advisory; color: window.amber; font.family: "Consolas"; font.pixelSize: 11; font.bold: true }
+                        Text { Layout.fillWidth: true; text: airTrafficViewModel.weatherSummary.advisory; color: window.amber; font.family: "Consolas"; font.pixelSize: 11; font.bold: true; elide: Text.ElideRight }
                         Item { Layout.fillHeight: true }
                     }
                     ColumnLayout {
@@ -723,14 +741,16 @@ ApplicationWindow {
                         Repeater {
                             model: airTrafficViewModel.sectorLoads
                             ColumnLayout {
+                                id: sectorLoad
+                                required property var modelData
                                 Layout.fillWidth: true; spacing: 5
                                 RowLayout {
                                     Layout.fillWidth: true
-                                    Text { text: modelData.name; color: window.textMain; font.family: "Consolas"; font.pixelSize: 13; font.bold: true }
+                                    Text { text: sectorLoad.modelData.name; color: window.textMain; font.family: "Consolas"; font.pixelSize: 13; font.bold: true }
                                     Item { Layout.fillWidth: true }
-                                    Text { text: modelData.trackCount + " AIR TAXIS"; color: window.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
+                                    Text { text: sectorLoad.modelData.trackCount + " AIR TAXIS"; color: window.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
                                 }
-                                Rectangle { Layout.fillWidth: true; height: 6; color: "#1a2926"; Rectangle { width: parent.width * modelData.load; height: parent.height; color: modelData.category === "primary" ? window.green : window.cyan } }
+                                Rectangle { Layout.fillWidth: true; height: 6; color: "#1a2926"; Rectangle { width: parent.width * sectorLoad.modelData.load; height: parent.height; color: sectorLoad.modelData.category === "primary" ? window.green : window.cyan } }
                             }
                         }
                         Item { Layout.fillHeight: true }
@@ -782,13 +802,13 @@ ApplicationWindow {
     }
     Shortcut {
         sequence: "Ctrl+-"
-        enabled: appShellViewModel.selectedModuleIndex === 0 && !airTrafficViewModel.atMinimumRange
-        onActivated: airTrafficViewModel.decreaseRange()
+        enabled: appShellViewModel.selectedModuleIndex === 0 && !airTrafficViewModel.atMaximumRange
+        onActivated: airTrafficViewModel.increaseRange()
     }
     Shortcut {
         sequence: "Ctrl+="
-        enabled: appShellViewModel.selectedModuleIndex === 0 && !airTrafficViewModel.atMaximumRange
-        onActivated: airTrafficViewModel.increaseRange()
+        enabled: appShellViewModel.selectedModuleIndex === 0 && !airTrafficViewModel.atMinimumRange
+        onActivated: airTrafficViewModel.decreaseRange()
     }
     Shortcut {
         sequence: "Ctrl+0"

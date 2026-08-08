@@ -41,8 +41,4 @@ QML_SOURCES += \
 	presentation/MultiStakeholderView.qml \
 	presentation/HubGroundOperationsView.qml \
 	presentation/VehicleTelemetryView.qml
-
-QML_FILES += $$QML_SOURCES
-OTHER_FILES += $$QML_SOURCES
-
 TARGET = AirTrafficManagement

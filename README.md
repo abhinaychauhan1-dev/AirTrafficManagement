@@ -21,6 +21,25 @@ A desktop-based Air Taxi Traffic Management and simulation application built usi
 
 ---
 
+## Runtime Configuration
+
+The application runs with its built-in Delhi demonstration simulation when no MQTT broker is available. The demonstration data and operator labels contain Delhi-specific vertiports and corridors; deploying another operating area requires replacing that configured simulation data.
+
+MQTT event exchange is optional and is configured before launch with environment variables:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ATTM_MQTT_HOST` | `localhost` | Broker hostname |
+| `ATTM_MQTT_PORT` | `1883` (`8883` with TLS) | Broker port |
+| `ATTM_MQTT_TOPIC` | `attm/events` | Publish and subscribe topic |
+| `ATTM_MQTT_USERNAME` | empty | Optional broker username |
+| `ATTM_MQTT_PASSWORD` | empty | Optional broker password |
+| `ATTM_MQTT_TLS` | `false` | Enable TLS with `true` or `1` |
+
+The defaults are intended only for local development. Networked deployment must use an authenticated broker and TLS on trusted infrastructure; do not expose unencrypted MQTT to an untrusted network.
+
+---
+
 ## Software Assurance
 
 The project applies selected DO-178C-aligned principles for deterministic behavior, defensive boundary validation, requirements traceability, and verification readiness. It also applies an ASTM F3548-21-aligned interoperability profile for versioned operational intent and selected ICAO Doc 9859-aligned safety-management practices for hazard ownership, risk assessment, mitigation, and assurance monitoring. It is not certified airborne software, an ASTM-conformant USS implementation, or an approved Safety Management System.

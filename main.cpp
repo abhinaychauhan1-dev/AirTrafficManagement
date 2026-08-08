@@ -13,8 +13,8 @@
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
-    QGuiApplication::setApplicationName(QStringLiteral("Air Traffic Management"));
-    QGuiApplication::setOrganizationName(QStringLiteral("ATM Systems"));
+    QGuiApplication::setApplicationName(QStringLiteral("Air Taxi Traffic Management"));
+    QGuiApplication::setOrganizationName(QStringLiteral("Air Taxi Systems"));
 
     AirTrafficViewModel viewModel;
     atm::face::components::SurveillanceComponent surveillance;

@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -424,9 +426,9 @@ Item {
                                                 RotationAnimation on rotation {
                                                     from: index % 2 === 0 ? 0 : 360
                                                     to: index % 2 === 0 ? 360 : 0
-                                                    duration: Math.max(760, 2600000 / rpm)
+                                                    duration: rpm > 0 ? Math.max(760, 2600000 / rpm) : 2500
                                                     loops: Animation.Infinite
-                                                    running: root.visible
+                                                    running: root.visible && rpm > 0
                                                 }
                                             }
                                             Rectangle {

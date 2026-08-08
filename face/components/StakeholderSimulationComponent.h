@@ -34,6 +34,7 @@ public:
 private:
     void publish(v1::Stakeholder source, const std::string &message,
                  const std::string &correlationId = {}, std::uint32_t entityVersion = 0);
+    void updateZoneOccupancy(const std::string &corridor, int delta);
     void updateMissionStatus(const std::string &callSign, const std::string &status);
 
     interfaces::IEventTransport &m_transport;

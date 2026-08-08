@@ -117,6 +117,7 @@ QVariantList QtStakeholderSimulationAdapter::vertiports() const
             {QStringLiteral("turnaround"), vertiport.turnaroundMinutes},
             {QStringLiteral("chargingMinutes"), vertiport.chargingMinutes},
             {QStringLiteral("chargingCallSign"), QString::fromStdString(vertiport.chargingCallSign)},
+            {QStringLiteral("turnaroundCallSign"), QString::fromStdString(vertiport.turnaroundCallSign)},
             {QStringLiteral("status"), QString::fromStdString(vertiport.status)},
             {QStringLiteral("saturated"), saturated},
             {QStringLiteral("severity"), saturated ? QStringLiteral("warning") : QStringLiteral("normal")}

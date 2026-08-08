@@ -118,12 +118,23 @@ int AirTrafficViewModel::selectedFilteredTrack() const
 
 void AirTrafficViewModel::reconcileFilteredSelection()
 {
-    if (m_filteredAirTaxis.rowCount() > 0 && selectedFilteredTrack() < 0)
+    if (m_airTaxis.rowCount() == 0) {
+        setSelectedTrack(-1);
+    } else if (m_filteredAirTaxis.rowCount() > 0 && selectedFilteredTrack() < 0) {
         setSelectedTrack(m_filteredAirTaxis.sourceRowForProxyRow(0));
+    }
 }
 
 void AirTrafficViewModel::setSelectedTrack(int selectedTrack)
 {
+    if (m_airTaxis.rowCount() == 0) {
+        if (m_selectedTrack == -1)
+            return;
+        m_selectedTrack = -1;
+        emit selectedTrackChanged();
+        emit surveillanceChanged();
+        return;
+    }
     const int boundedTrack = qBound(0, selectedTrack, m_airTaxis.rowCount() - 1);
     if (m_selectedTrack == boundedTrack)
         return;

@@ -139,7 +139,7 @@ private:
     QString m_phaseFilter;
     QString m_squawkFilter;
     QString m_currentAlertCallSign;
-    int m_selectedTrack = 0;
+    int m_selectedTrack = -1;
     int m_rangeNm = 20;
     int m_surveillanceTick = 0;
     qreal m_viewCenterX = .5;

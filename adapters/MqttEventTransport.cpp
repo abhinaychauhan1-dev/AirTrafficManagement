@@ -10,9 +10,11 @@
 #include <QUuid>
 
 #include <algorithm>
-#include <utility>
+#include <cmath>
 #include <cstddef> // For std::size_t
 #include <cstdint> // For std::uint16_t, std::uint64_t
+#include <limits>
+#include <utility>
 
 namespace {
 
@@ -79,6 +81,8 @@ MqttEventTransport::MqttEventTransport(QObject *parent, std::size_t capacity)
 
 void MqttEventTransport::publish(atm::face::v1::SimulationEvent event)
 {
+    if (m_nextSequence == std::numeric_limits<std::uint64_t>::max())
+        return;
     event.sequence = m_nextSequence++;
     store(event);
     if (m_connected)
@@ -228,10 +232,10 @@ void MqttEventTransport::processPacket(quint8 header, const QByteArray &body)
 
     const int topicLength = (static_cast<quint8>(body.at(0)) << 8)
                           | static_cast<quint8>(body.at(1));
-    int payloadOffset = 2 + topicLength;
     const int qos = (header >> 1) & 0x03;
-    if (topicLength < 0 || payloadOffset > body.size())
+    if (qos == 3 || topicLength == 0 || topicLength > body.size() - 2)
         return;
+    int payloadOffset = 2 + topicLength;
 
     quint16 packetId = 0;
     if (qos > 0) {
@@ -259,15 +263,24 @@ void MqttEventTransport::processPacket(quint8 header, const QByteArray &body)
     atm::face::v1::SimulationEvent event;
     event.schemaVersion = static_cast<std::uint16_t>(payload.value(QStringLiteral("schemaVersion")).toInt());
     const QJsonValue sequence = payload.value(QStringLiteral("sequence"));
-    event.sequence = sequence.isString() ? sequence.toString().toULongLong()
-                                         : static_cast<std::uint64_t>(sequence.toDouble());
+    bool sequenceValid = false;
+    if (sequence.isString()) {
+        event.sequence = sequence.toString().toULongLong(&sequenceValid);
+    } else if (sequence.isDouble()) {
+        const double numericSequence = sequence.toDouble();
+        sequenceValid = std::isfinite(numericSequence) && numericSequence >= 1.0
+            && numericSequence <= 9007199254740991.0 && std::floor(numericSequence) == numericSequence;
+        if (sequenceValid)
+            event.sequence = static_cast<std::uint64_t>(numericSequence);
+    }
     event.simulationMinutes = payload.value(QStringLiteral("simulationMinutes")).toInt();
     event.source = static_cast<atm::face::v1::Stakeholder>(payload.value(QStringLiteral("source")).toInt());
     event.message = payload.value(QStringLiteral("message")).toString().toStdString();
     event.correlationId = payload.value(QStringLiteral("correlationId")).toString().toStdString();
     event.entityVersion = static_cast<std::uint32_t>(payload.value(QStringLiteral("entityVersion")).toInteger());
     const int sourceValue = static_cast<int>(event.source);
-    if (event.schemaVersion != atm::face::v1::kSchemaVersion || event.sequence == 0
+    if (event.schemaVersion != atm::face::v1::kSchemaVersion || !sequenceValid
+        || event.sequence == 0 || event.sequence == std::numeric_limits<std::uint64_t>::max()
         || event.simulationMinutes < 0 || event.simulationMinutes >= 24 * 60
         || sourceValue < static_cast<int>(atm::face::v1::Stakeholder::System)
         || sourceValue > static_cast<int>(atm::face::v1::Stakeholder::UrbanAuthority)

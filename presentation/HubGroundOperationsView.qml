@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -16,6 +18,7 @@ Item {
     property real pressure: 1007.8
     property int telemetryTick: 0
     property string operationMessage: "PAD, ENERGY, FLOW AND WEATHER CONTROL"
+    readonly property bool hasSelectedPad: selectedPad >= 0 && selectedPad < padModel.count
 
     readonly property color panel: "#0c1716"
     readonly property color raised: "#12201e"
@@ -49,7 +52,8 @@ Item {
             padModel.setProperty(selectedPad, "detail", "READY FOR ASSIGNMENT")
             operationMessage = "PAD " + currentPad.pad + " RELEASED AND AVAILABLE"
         } else if (status === "RESERVED") {
-            const nextCallSign = arrivalModel.count > 0 ? arrivalModel.get(0).callSign : "NEXT"
+            const arrivalIndex = nextPendingIndex(arrivalModel)
+            const nextCallSign = arrivalIndex >= 0 ? arrivalModel.get(arrivalIndex).callSign : "NEXT"
             padModel.setProperty(selectedPad, "airTaxi", nextCallSign)
             padModel.setProperty(selectedPad, "detail", "ARRIVAL WINDOW / QUEUE 01")
             operationMessage = "PAD " + currentPad.pad + " RESERVED FOR " + nextCallSign
@@ -60,14 +64,31 @@ Item {
         }
     }
 
-    function reindexQueue(model) {
-        for (let index = 0; index < model.count; ++index)
-            model.setProperty(index, "order", String(index + 1).padStart(2, "0"))
+    function pendingQueueCount(model) {
+        let count = 0
+        for (let index = 0; index < model.count; ++index) {
+            if (!model.get(index).processed)
+                ++count
+        }
+        return count
     }
 
-    function availablePadIndex(preferredIndex) {
+    function nextPendingIndex(model) {
+        for (let index = 0; index < model.count; ++index) {
+            if (!model.get(index).processed)
+                return index
+        }
+        return -1
+    }
+
+    function availablePadIndex(preferredIndex, callSign) {
+        for (let index = 0; index < padModel.count; ++index) {
+            const candidate = padModel.get(index)
+            if (candidate.status === "RESERVED" && candidate.airTaxi === callSign)
+                return index
+        }
         if (preferredIndex >= 0 && preferredIndex < padModel.count
-                && ["AVAILABLE", "RESERVED"].includes(padModel.get(preferredIndex).status))
+                && padModel.get(preferredIndex).status === "AVAILABLE")
             return preferredIndex
         for (let index = 0; index < padModel.count; ++index) {
             if (padModel.get(index).status === "AVAILABLE")
@@ -78,14 +99,15 @@ Item {
 
     function advanceQueue() {
         const model = queueMode === 0 ? arrivalModel : departureModel
-        if (model.count === 0) {
+        const queueIndex = nextPendingIndex(model)
+        if (queueIndex < 0) {
             operationMessage = queueMode === 0 ? "NO ARRIVALS WAITING" : "NO DEPARTURES WAITING"
             return
         }
 
-        const flight = model.get(0)
+        const flight = model.get(queueIndex)
         if (queueMode === 0) {
-            const padIndex = availablePadIndex(selectedPad)
+            const padIndex = availablePadIndex(selectedPad, flight.callSign)
             if (padIndex < 0) {
                 operationMessage = "ARRIVAL " + flight.callSign + " HELD / NO PAD AVAILABLE"
                 return
@@ -99,28 +121,38 @@ Item {
                                     "task": "GROUND SERVICE", "progress": 0,
                                     "battery": 48, "elapsed": 0, "target": 18,
                                     "accent": "cyan"})
+            model.setProperty(queueIndex, "state", "ON PAD " + padName)
             operationMessage = flight.callSign + " ARRIVED / PAD " + padName + " TURNAROUND STARTED"
         } else {
             let releasedPad = ""
             for (let index = 0; index < padModel.count; ++index) {
                 if (padModel.get(index).airTaxi === flight.callSign) {
+                    if (!padModel.get(index).detail.startsWith("SERVICE COMPLETE")) {
+                        operationMessage = flight.callSign + " HELD / GROUND SERVICE NOT COMPLETE"
+                        return
+                    }
                     releasedPad = padModel.get(index).pad
                     selectedPad = index
                     setSelectedPadStatus("AVAILABLE")
                     break
                 }
             }
+            if (!releasedPad.length) {
+                operationMessage = flight.callSign + " HELD / NO ASSIGNED PAD"
+                return
+            }
             operationMessage = flight.callSign + " RELEASED TO " + flight.route
-                    + (releasedPad.length ? " / PAD " + releasedPad + " AVAILABLE" : "")
+                    + " / PAD " + releasedPad + " AVAILABLE"
+            model.setProperty(queueIndex, "state", "DEPARTED")
         }
-        model.remove(0)
-        reindexQueue(model)
+        model.setProperty(queueIndex, "processed", true)
     }
 
     function completeTurnaround(index) {
         if (index < 0 || index >= turnaroundModel.count)
             return
         const service = turnaroundModel.get(index)
+        let departureQueued = false
         for (let padIndex = 0; padIndex < padModel.count; ++padIndex) {
             if (padModel.get(padIndex).pad === service.pad
                     && padModel.get(padIndex).airTaxi === service.callSign) {
@@ -128,8 +160,37 @@ Item {
                 break
             }
         }
+        for (let queueIndex = 0; queueIndex < departureModel.count; ++queueIndex) {
+            if (departureModel.get(queueIndex).callSign === service.callSign
+                    && !departureModel.get(queueIndex).processed) {
+                departureModel.setProperty(queueIndex, "state", "PAD READY")
+                departureQueued = true
+                break
+            }
+        }
+        if (!departureQueued) {
+            departureModel.append({"order": String(departureModel.count + 1).padStart(2, "0"),
+                                   "callSign": service.callSign, "route": "C-DELTA",
+                                   "time": root.viewModel.simulationTime,
+                                   "state": "PAD READY", "priority": "NORMAL",
+                                   "processed": false})
+        }
         turnaroundModel.remove(index)
         operationMessage = service.callSign + " TURNAROUND COMPLETE / READY FOR DEPARTURE"
+    }
+
+    function queueSummary() {
+        const model = queueMode === 0 ? arrivalModel : departureModel
+        const queueIndex = nextPendingIndex(model)
+        if (queueIndex < 0)
+            return queueMode === 0 ? "NO ARRIVALS WAITING" : "NO DEPARTURES WAITING"
+        const flight = model.get(queueIndex)
+        if (queueMode === 1)
+            return "NEXT RELEASE: " + flight.callSign + " / " + flight.state
+        const padIndex = availablePadIndex(selectedPad, flight.callSign)
+        return padIndex >= 0
+                ? "NEXT PAD: " + padModel.get(padIndex).pad + " / SEPARATION 90 SEC"
+                : "NEXT PAD: HOLD / CAPACITY FULL"
     }
 
     component PanelTitle: RowLayout {
@@ -205,7 +266,7 @@ Item {
     ListModel {
         id: padModel
         ListElement { pad: "A1"; status: "OCCUPIED"; airTaxi: "ATX201"; detail: "CHARGING / 06 MIN" }
-        ListElement { pad: "A2"; status: "RESERVED"; airTaxi: "URB308"; detail: "ARRIVAL WINDOW +03 MIN" }
+        ListElement { pad: "A2"; status: "OCCUPIED"; airTaxi: "URB308"; detail: "GROUND CHECK / 03 MIN" }
         ListElement { pad: "A3"; status: "AVAILABLE"; airTaxi: "--"; detail: "READY FOR ASSIGNMENT" }
         ListElement { pad: "A4"; status: "MAINTENANCE"; airTaxi: "LOCKED"; detail: "FOD INSPECTION / 12 MIN" }
         ListElement { pad: "B1"; status: "AVAILABLE"; airTaxi: "--"; detail: "READY FOR ASSIGNMENT" }
@@ -223,16 +284,15 @@ Item {
 
     ListModel {
         id: arrivalModel
-        ListElement { order: "01"; callSign: "URB308"; route: "VPT-DILLI"; time: "08:32"; state: "FINAL"; priority: "NORMAL" }
-        ListElement { order: "02"; callSign: "MED805"; route: "AIIMS-V8"; time: "08:36"; state: "HOLD 2 MIN"; priority: "MEDICAL" }
-        ListElement { order: "03"; callSign: "ECO518"; route: "VPT-CP"; time: "08:41"; state: "INBOUND"; priority: "NORMAL" }
+        ListElement { order: "01"; callSign: "MED805"; route: "AIIMS-V8"; time: "08:36"; state: "HOLD 2 MIN"; priority: "MEDICAL"; processed: false }
+        ListElement { order: "02"; callSign: "ECO518"; route: "VPT-CP"; time: "08:41"; state: "INBOUND"; priority: "NORMAL"; processed: false }
     }
 
     ListModel {
         id: departureModel
-        ListElement { order: "01"; callSign: "ATX201"; route: "VPT-IGI"; time: "08:35"; state: "PAD READY"; priority: "NORMAL" }
-        ListElement { order: "02"; callSign: "SKY114"; route: "VPT-CP"; time: "08:39"; state: "CHARGING"; priority: "NORMAL" }
-        ListElement { order: "03"; callSign: "UAM412"; route: "VPT-NOIDA"; time: "08:44"; state: "SLOT HELD"; priority: "NORMAL" }
+        ListElement { order: "01"; callSign: "ATX201"; route: "VPT-IGI"; time: "08:35"; state: "PAD READY"; priority: "NORMAL"; processed: false }
+        ListElement { order: "02"; callSign: "SKY114"; route: "VPT-CP"; time: "08:39"; state: "CHARGING"; priority: "NORMAL"; processed: false }
+        ListElement { order: "03"; callSign: "UAM412"; route: "VPT-NOIDA"; time: "08:44"; state: "SLOT HELD"; priority: "NORMAL"; processed: false }
     }
 
     Timer {
@@ -251,7 +311,8 @@ Item {
                 if (current.progress < 100) {
                     const nextProgress = Math.min(100, current.progress + 1)
                     turnaroundModel.setProperty(index, "progress", nextProgress)
-                    turnaroundModel.setProperty(index, "battery", Math.min(100, current.battery + (index === 0 ? 1 : 0)))
+                    const energyService = current.task.includes("CHARGE") || current.task.includes("BATTERY")
+                    turnaroundModel.setProperty(index, "battery", Math.min(100, current.battery + (energyService ? 1 : 0)))
                     if (root.telemetryTick % 4 === 0)
                         turnaroundModel.setProperty(index, "elapsed", current.elapsed + 1)
                     if (nextProgress === 100)
@@ -360,11 +421,11 @@ Item {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 6
-                            Text { text: "PAD " + padModel.get(root.selectedPad).pad; color: root.textMain; font.family: "Consolas"; font.pixelSize: 11; font.bold: true }
+                            Text { text: root.hasSelectedPad ? "PAD " + padModel.get(root.selectedPad).pad : "NO PAD"; color: root.textMain; font.family: "Consolas"; font.pixelSize: 11; font.bold: true }
                             Item { Layout.fillWidth: true }
-                            OpsButton { text: "RESERVE"; accent: root.amber; enabled: padModel.get(root.selectedPad).status !== "RESERVED"; onClicked: root.setSelectedPadStatus("RESERVED") }
-                            OpsButton { text: "MARK AVAILABLE"; enabled: padModel.get(root.selectedPad).status !== "AVAILABLE"; onClicked: root.setSelectedPadStatus("AVAILABLE") }
-                            OpsButton { text: "MAINTENANCE"; accent: root.red; enabled: padModel.get(root.selectedPad).status !== "MAINTENANCE"; onClicked: root.setSelectedPadStatus("MAINTENANCE") }
+                            OpsButton { text: "RESERVE"; accent: root.amber; enabled: root.hasSelectedPad && padModel.get(root.selectedPad).status === "AVAILABLE" && arrivalModel.count > 0; onClicked: root.setSelectedPadStatus("RESERVED") }
+                            OpsButton { text: "MARK AVAILABLE"; enabled: root.hasSelectedPad && padModel.get(root.selectedPad).status !== "AVAILABLE"; onClicked: root.setSelectedPadStatus("AVAILABLE") }
+                            OpsButton { text: "MAINTENANCE"; accent: root.red; enabled: root.hasSelectedPad && padModel.get(root.selectedPad).status === "AVAILABLE"; onClicked: root.setSelectedPadStatus("MAINTENANCE") }
                         }
                     }
                 }
@@ -440,8 +501,8 @@ Item {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 5
-                            OpsButton { Layout.fillWidth: true; text: "ARRIVALS  " + arrivalModel.count; accent: root.queueMode === 0 ? root.cyan : root.textMuted; onClicked: root.queueMode = 0 }
-                            OpsButton { Layout.fillWidth: true; text: "DEPARTURES  " + departureModel.count; accent: root.queueMode === 1 ? root.green : root.textMuted; onClicked: root.queueMode = 1 }
+                            OpsButton { Layout.fillWidth: true; text: "ARRIVALS  " + root.pendingQueueCount(arrivalModel); accent: root.queueMode === 0 ? root.cyan : root.textMuted; onClicked: root.queueMode = 0 }
+                            OpsButton { Layout.fillWidth: true; text: "DEPARTURES  " + root.pendingQueueCount(departureModel); accent: root.queueMode === 1 ? root.green : root.textMuted; onClicked: root.queueMode = 1 }
                         }
                         ListView {
                             id: queueList
@@ -457,16 +518,18 @@ Item {
                                 required property string time
                                 required property string state
                                 required property string priority
+                                required property bool processed
                                 width: ListView.view.width
                                 height: 66
                                 radius: 3
-                                color: root.deep
-                                border.color: priority === "MEDICAL" ? root.red : root.line
+                                color: processed ? "#0b1715" : root.deep
+                                border.color: processed ? "#315048" : (priority === "MEDICAL" ? root.red : root.line)
+                                opacity: processed ? 0.68 : 1.0
                                 RowLayout {
                                     anchors.fill: parent
                                     anchors.margins: 8
                                     spacing: 10
-                                    Text { text: order; color: root.queueMode === 0 ? root.cyan : root.green; font.family: "Consolas"; font.pixelSize: 18; font.bold: true }
+                                    Text { text: processed ? "✓" : order; color: processed ? root.green : (root.queueMode === 0 ? root.cyan : root.green); font.family: "Consolas"; font.pixelSize: 18; font.bold: true }
                                     Column { Layout.fillWidth: true; Text { text: callSign + "  /  " + route; width: parent.width; color: root.textMain; font.family: "Consolas"; font.pixelSize: 12; font.bold: true; elide: Text.ElideRight } Text { text: state; color: priority === "MEDICAL" ? root.red : root.textMuted; font.family: "Consolas"; font.pixelSize: 10 } }
                                     Text { text: time; color: root.textMain; font.family: "Consolas"; font.pixelSize: 13; font.bold: true }
                                 }
@@ -474,11 +537,11 @@ Item {
                         }
                         RowLayout {
                             Layout.fillWidth: true
-                            Text { Layout.fillWidth: true; text: root.queueMode === 0 ? "NEXT PAD: A2 / SEPARATION 90 SEC" : "NEXT RELEASE: C-DELTA"; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 9 }
+                            Text { Layout.fillWidth: true; text: root.queueSummary(); color: root.textMuted; font.family: "Consolas"; font.pixelSize: 9; elide: Text.ElideRight }
                             OpsButton {
                                 text: "ADVANCE QUEUE"
                                 accent: root.queueMode === 0 ? root.cyan : root.green
-                                enabled: (root.queueMode === 0 ? arrivalModel.count : departureModel.count) > 0
+                                enabled: root.pendingQueueCount(root.queueMode === 0 ? arrivalModel : departureModel) > 0
                                 onClicked: root.advanceQueue()
                             }
                         }
@@ -531,7 +594,7 @@ Item {
                                         color: root.cyan
                                         transformOrigin: Item.Bottom
                                         rotation: root.windDirection
-                                        Behavior on rotation { NumberAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+                                        Behavior on rotation { RotationAnimation { duration: 700; direction: RotationAnimation.Shortest; easing.type: Easing.InOutCubic } }
                                     }
                                     Rectangle { anchors.centerIn: parent; width: 10; height: 10; radius: 5; color: root.cyan }
                                     Text { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 8; text: root.windDirection + "°"; color: root.textMain; font.family: "Consolas"; font.pixelSize: 12; font.bold: true }

@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 
 Item {
@@ -278,6 +280,10 @@ Item {
                     font.family: "Consolas"
                     font.pixelSize: 12
                     lineHeight: 0.9
+                    maximumLineCount: 2
+                    wrapMode: Text.WrapAnywhere
+                    elide: Text.ElideRight
+                    clip: true
                 }
             }
             HoverHandler {
