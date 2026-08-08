@@ -1,20 +1,42 @@
 #include "StakeholderSimulationComponent.h"
 
 #include <algorithm>
+#include <cctype>
 #include <iomanip>
 #include <sstream>
 
 namespace atm::face::components {
 namespace {
 
-std::string addMinutes(const std::string &time, int minutes)
+constexpr std::size_t kMaximumOperationalTextLength = 64;
+
+bool isValidOperationalText(const std::string &value)
 {
-    const int hours = std::stoi(time.substr(0, 2));
-    const int currentMinutes = std::stoi(time.substr(3, 2));
+    return !value.empty() && value.size() <= kMaximumOperationalTextLength
+        && std::all_of(value.cbegin(), value.cend(), [](unsigned char character) {
+               return character >= 0x20 && character <= 0x7e;
+           });
+}
+
+bool addMinutes(const std::string &time, int minutes, std::string &result)
+{
+    if (time.size() != 5 || time[2] != ':'
+        || !std::isdigit(static_cast<unsigned char>(time[0]))
+        || !std::isdigit(static_cast<unsigned char>(time[1]))
+        || !std::isdigit(static_cast<unsigned char>(time[3]))
+        || !std::isdigit(static_cast<unsigned char>(time[4])))
+        return false;
+
+    const int hours = (time[0] - '0') * 10 + (time[1] - '0');
+    const int currentMinutes = (time[3] - '0') * 10 + (time[4] - '0');
+    if (hours > 23 || currentMinutes > 59)
+        return false;
+
     const int total = (hours * 60 + currentMinutes + minutes) % (24 * 60);
     std::ostringstream stream;
     stream << std::setfill('0') << std::setw(2) << total / 60 << ':' << std::setw(2) << total % 60;
-    return stream.str();
+    result = stream.str();
+    return true;
 }
 
 } // namespace
@@ -33,7 +55,8 @@ int StakeholderSimulationComponent::simulationMinutes() const { return m_minutes
 
 bool StakeholderSimulationComponent::planMission(std::size_t index, const std::string &route, const std::string &profile)
 {
-    if (index >= m_missions.size() || route.empty())
+    if (index >= m_missions.size() || !isValidOperationalText(route)
+        || !isValidOperationalText(profile) || route.find(" - ") == std::string::npos)
         return false;
     v1::Mission &mission = m_missions[index];
     mission.route = route;
@@ -68,7 +91,10 @@ bool StakeholderSimulationComponent::delayMission(std::size_t index)
     if (index >= m_missions.size())
         return false;
     v1::Mission &mission = m_missions[index];
-    mission.departure = addMinutes(mission.departure, 5);
+    std::string delayedDeparture;
+    if (!addMinutes(mission.departure, 5, delayedDeparture))
+        return false;
+    mission.departure = delayedDeparture;
     mission.status = "RESCHEDULED";
     const auto slot = std::find_if(m_slotRequests.begin(), m_slotRequests.end(), [&](const v1::SlotRequest &request) {
         return request.callSign == mission.callSign;
@@ -86,6 +112,12 @@ bool StakeholderSimulationComponent::assignGate(std::size_t index, const std::st
     if (index >= m_vertiports.size() || callSign.empty())
         return false;
     v1::Vertiport &vertiport = m_vertiports[index];
+    const auto mission = std::find_if(m_missions.begin(), m_missions.end(), [&](const v1::Mission &candidate) {
+        return candidate.callSign == callSign;
+    });
+    if (mission == m_missions.end() || mission->status == "GATE ASSIGNED"
+        || mission->status == "CHARGING")
+        return false;
     if (vertiport.freeGates == 0) {
         vertiport.status = "GATE WAITLIST";
         updateMissionStatus(callSign, "GATE WAITLIST");
@@ -106,6 +138,12 @@ bool StakeholderSimulationComponent::startCharging(std::size_t index, const std:
     if (index >= m_vertiports.size() || callSign.empty())
         return false;
     v1::Vertiport &vertiport = m_vertiports[index];
+    const auto mission = std::find_if(m_missions.begin(), m_missions.end(), [&](const v1::Mission &candidate) {
+        return candidate.callSign == callSign;
+    });
+    if (mission == m_missions.end() || mission->status == "CHARGING"
+        || vertiport.chargingCallSign == callSign)
+        return false;
     if (vertiport.freeChargers == 0) {
         vertiport.status = "CHARGER QUEUE";
         updateMissionStatus(callSign, "CHARGER QUEUE");
@@ -127,6 +165,16 @@ bool StakeholderSimulationComponent::decideSlot(std::size_t index, bool granted)
     if (index >= m_slotRequests.size())
         return false;
     v1::SlotRequest &slot = m_slotRequests[index];
+    const auto restrictedZone = std::find_if(m_complianceZones.begin(), m_complianceZones.end(), [&](const v1::ComplianceZone &zone) {
+        return zone.track == slot.corridor && zone.enforced
+            && zone.currentOverflights >= zone.overflightCap;
+    });
+    if (granted && restrictedZone != m_complianceZones.end()) {
+        slot.status = "HELD - NOISE";
+        updateMissionStatus(slot.callSign, "COMPLIANCE HOLD");
+        publish(v1::Stakeholder::AnspPsu, slot.callSign + " slot held by " + restrictedZone->name);
+        return true;
+    }
     slot.status = granted ? "GRANTED" : "DENIED";
     updateMissionStatus(slot.callSign, granted ? "SLOT GRANTED" : "SLOT DENIED");
     publish(v1::Stakeholder::AnspPsu, slot.callSign + " slot " + (granted ? "granted" : "denied") + " on " + slot.corridor);
@@ -143,14 +191,15 @@ bool StakeholderSimulationComponent::setBoundaryEnforcement(std::size_t index, b
     zone.status = enforced ? (capReached ? "CAP ENFORCED" : "BOUNDARY ACTIVE") : "MONITOR ONLY";
     if (enforced && capReached) {
         for (v1::SlotRequest &slot : m_slotRequests) {
-            if (slot.status == "PENDING" || slot.status == "REVIEW") {
+            if (slot.corridor == zone.track
+                && (slot.status == "PENDING" || slot.status == "REVIEW")) {
                 slot.status = "HELD - NOISE";
                 updateMissionStatus(slot.callSign, "COMPLIANCE HOLD");
             }
         }
     } else if (!enforced) {
         for (v1::SlotRequest &slot : m_slotRequests) {
-            if (slot.status == "HELD - NOISE") {
+            if (slot.corridor == zone.track && slot.status == "HELD - NOISE") {
                 slot.status = "REVIEW";
                 updateMissionStatus(slot.callSign, "SLOT REVIEW");
             }

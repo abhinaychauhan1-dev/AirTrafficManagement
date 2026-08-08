@@ -1,6 +1,40 @@
 #include "AirTaxiListModel.h"
 
-#include <QtMath>
+#include <QSet>
+
+#include <algorithm>
+#include <cmath>
+
+namespace {
+
+constexpr std::size_t kMaximumTrackCount = 256;
+
+bool isValidSurveillanceState(const atm::face::contracts::v1::SurveillanceState &state)
+{
+    if (state.schemaVersion != atm::face::contracts::v1::kSurveillanceSchemaVersion
+        || state.tracks.size() > kMaximumTrackCount)
+        return false;
+
+    QSet<QString> callSigns;
+    for (const auto &track : state.tracks) {
+        const QString callSign = QString::fromStdString(track.callSign);
+        const QString squawk = QString::fromStdString(track.squawk);
+        if (callSign.isEmpty() || callSign.size() > 16 || callSigns.contains(callSign)
+            || squawk.size() != 4
+            || !std::all_of(squawk.cbegin(), squawk.cend(), [](QChar character) { return character.isDigit(); })
+            || !std::isfinite(track.positionX) || track.positionX < 0.0 || track.positionX > 1.0
+            || !std::isfinite(track.positionY) || track.positionY < 0.0 || track.positionY > 1.0
+            || track.altitudeFt < 0 || track.altitudeFt > 10000
+            || track.speedKts < 0 || track.speedKts > 250
+            || track.heading < 0 || track.heading >= 360
+            || track.trend < -1 || track.trend > 1)
+            return false;
+        callSigns.insert(callSign);
+    }
+    return true;
+}
+
+} // namespace
 
 AirTaxiListModel::AirTaxiListModel(QObject *parent)
     : QAbstractListModel(parent)
@@ -103,44 +137,11 @@ int AirTaxiListModel::alertCount() const
     return count;
 }
 
-bool AirTaxiListModel::advanceOneSecond(int tick)
+bool AirTaxiListModel::updateFromState(const atm::face::contracts::v1::SurveillanceState &state)
 {
-    const int previousAlertCount = alertCount();
+    if (!isValidSurveillanceState(state))
+        return false;
 
-    for (int row = 0; row < m_airTaxis.size(); ++row) {
-        AirTaxi &airTaxi = m_airTaxis[row];
-        const qreal headingRadians = qDegreesToRadians(static_cast<qreal>(airTaxi.heading));
-        const qreal distance = airTaxi.speed * 0.0000022;
-        airTaxi.positionX += qSin(headingRadians) * distance;
-        airTaxi.positionY -= qCos(headingRadians) * distance;
-
-        if (airTaxi.positionX < .06)
-            airTaxi.positionX = .94;
-        else if (airTaxi.positionX > .94)
-            airTaxi.positionX = .06;
-        if (airTaxi.positionY < .08)
-            airTaxi.positionY = .92;
-        else if (airTaxi.positionY > .92)
-            airTaxi.positionY = .08;
-
-        if ((tick + row) % 8 == 0)
-            airTaxi.heading = (airTaxi.heading + (row % 2 == 0 ? 1 : 359)) % 360;
-        if ((tick + row) % 6 == 0)
-            airTaxi.speed = qBound(40, airTaxi.speed + (row % 2 == 0 ? 1 : -1), 150);
-    }
-
-    AirTaxi &conflictAirTaxi = m_airTaxis[2];
-    conflictAirTaxi.alert = tick % 30 < 15;
-    conflictAirTaxi.state = conflictAirTaxi.alert ? QStringLiteral("CONFLICT") : QStringLiteral("EN ROUTE");
-
-    emit dataChanged(index(0), index(m_airTaxis.size() - 1),
-                     {SpeedRole, PositionXRole, PositionYRole, AlertRole, HeadingRole,
-                      StateRole, StatusLabelRole, SeverityRole});
-    return previousAlertCount != alertCount();
-}
-
-void AirTaxiListModel::updateFromState(const atm::face::contracts::v1::SurveillanceState &state)
-{
     beginResetModel();
     m_airTaxis.clear();
     m_airTaxis.reserve(static_cast<qsizetype>(state.tracks.size()));
@@ -161,4 +162,5 @@ void AirTaxiListModel::updateFromState(const atm::face::contracts::v1::Surveilla
                           75});
     }
     endResetModel();
+    return true;
 }

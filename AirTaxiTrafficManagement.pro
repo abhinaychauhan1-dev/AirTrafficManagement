@@ -10,7 +10,6 @@ SOURCES += \
 	adapters/QtSurveillanceAdapter.cpp \
 	face/components/StakeholderSimulationComponent.cpp \
 	face/components/SurveillanceComponent.cpp \
-	face/transport/InMemoryEventTransport.cpp \
 	models/AirTaxiFilterProxyModel.cpp \
 	models/AirTaxiListModel.cpp \
 	viewmodels/AppShellViewModel.cpp \
@@ -27,7 +26,6 @@ HEADERS += \
 	face/interfaces/ISurveillance.h \
 	face/components/StakeholderSimulationComponent.h \
 	face/components/SurveillanceComponent.h \
-	face/transport/InMemoryEventTransport.h \
 	models/AirTaxiFilterProxyModel.h \
 	models/AirTaxiListModel.h \
 	viewmodels/AppShellViewModel.h \
@@ -42,7 +40,7 @@ QML_SOURCES += \
 	presentation/InteractiveComboBox.qml \
 	presentation/MultiStakeholderView.qml \
 	presentation/HubGroundOperationsView.qml \
-	presentation/FeaturePlaceholder.qml
+	presentation/VehicleTelemetryView.qml
 
 QML_FILES += $$QML_SOURCES
 OTHER_FILES += $$QML_SOURCES

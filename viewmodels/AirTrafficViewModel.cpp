@@ -27,9 +27,6 @@ AirTrafficViewModel::AirTrafficViewModel(QObject *parent)
     m_clockTimer.start();
 
     m_currentAlertCallSign = alertAirTaxi().value(QStringLiteral("callSign")).toString();
-    m_surveillanceTimer.setInterval(1000);
-    connect(&m_surveillanceTimer, &QTimer::timeout, this, &AirTrafficViewModel::advanceSurveillance);
-    m_surveillanceTimer.start();
 }
 
 QAbstractItemModel *AirTrafficViewModel::airTaxis()
@@ -40,6 +37,11 @@ QAbstractItemModel *AirTrafficViewModel::airTaxis()
 QAbstractItemModel *AirTrafficViewModel::filteredAirTaxis()
 {
     return &m_filteredAirTaxis;
+}
+
+AirTaxiListModel &AirTrafficViewModel::airTaxiListModel()
+{
+    return m_airTaxis;
 }
 
 QString AirTrafficViewModel::airTaxiFilter() const
@@ -53,10 +55,8 @@ void AirTrafficViewModel::setAirTaxiFilter(const QString &filter)
         return;
     m_airTaxiFilter = filter;
     m_filteredAirTaxis.setQuery(filter);
-    if (m_filteredAirTaxis.rowCount() > 0 && selectedFilteredTrack() < 0)
-        setSelectedTrack(m_filteredAirTaxis.sourceRowForProxyRow(0));
+    reconcileFilteredSelection();
     emit airTaxiFilterChanged();
-    emit selectedTrackChanged();
 }
 
 QString AirTrafficViewModel::altitudeFilter() const { return m_altitudeFilter; }
@@ -69,8 +69,8 @@ void AirTrafficViewModel::setAltitudeFilter(const QString &filter)
         return;
     m_altitudeFilter = filter;
     m_filteredAirTaxis.setAltitudeBand(filter);
+    reconcileFilteredSelection();
     emit airTaxiFilterChanged();
-    emit selectedTrackChanged();
 }
 
 void AirTrafficViewModel::setPhaseFilter(const QString &filter)
@@ -79,8 +79,8 @@ void AirTrafficViewModel::setPhaseFilter(const QString &filter)
         return;
     m_phaseFilter = filter;
     m_filteredAirTaxis.setMissionPhase(filter);
+    reconcileFilteredSelection();
     emit airTaxiFilterChanged();
-    emit selectedTrackChanged();
 }
 
 void AirTrafficViewModel::setSquawkFilter(const QString &filter)
@@ -89,8 +89,8 @@ void AirTrafficViewModel::setSquawkFilter(const QString &filter)
         return;
     m_squawkFilter = filter;
     m_filteredAirTaxis.setSquawkCode(filter);
+    reconcileFilteredSelection();
     emit airTaxiFilterChanged();
-    emit selectedTrackChanged();
 }
 
 void AirTrafficViewModel::clearQuickFilters()
@@ -133,6 +133,12 @@ int AirTrafficViewModel::selectedTrack() const
 int AirTrafficViewModel::selectedFilteredTrack() const
 {
     return m_filteredAirTaxis.proxyRowForSourceRow(m_selectedTrack);
+}
+
+void AirTrafficViewModel::reconcileFilteredSelection()
+{
+    if (m_filteredAirTaxis.rowCount() > 0 && selectedFilteredTrack() < 0)
+        setSelectedTrack(m_filteredAirTaxis.sourceRowForProxyRow(0));
 }
 
 void AirTrafficViewModel::setSelectedTrack(int selectedTrack)
@@ -207,7 +213,7 @@ void AirTrafficViewModel::setRoutesEnabled(bool enabled)
 
 bool AirTrafficViewModel::operational() const
 {
-    return true;
+    return m_surveillanceInputValid;
 }
 
 bool AirTrafficViewModel::separationAlertActive() const
@@ -327,7 +333,11 @@ QString AirTrafficViewModel::radarId() const { return QStringLiteral("UAM SURVEI
 QString AirTrafficViewModel::updateRate() const { return QStringLiteral("1.0s"); }
 QString AirTrafficViewModel::adsbCoverage() const { return QStringLiteral("99.8%"); }
 QString AirTrafficViewModel::controllerPosition() const { return QStringLiteral("UAM OPS: PRIYA S.  -  DESK: DEL-C04"); }
-QString AirTrafficViewModel::dataStatusText() const { return QStringLiteral("LIVE AIR TAXI FEED"); }
+QString AirTrafficViewModel::dataStatusText() const
+{
+    return m_surveillanceInputValid ? QStringLiteral("LIVE AIR TAXI FEED")
+                                    : QStringLiteral("INPUT REJECTED / LAST KNOWN GOOD");
+}
 QString AirTrafficViewModel::lastUpdateTime() const { return istTime(); }
 qreal AirTrafficViewModel::viewCenterX() const { return m_viewCenterX; }
 qreal AirTrafficViewModel::viewCenterY() const { return m_viewCenterY; }
@@ -342,13 +352,6 @@ QString AirTrafficViewModel::istDate() const
     return QDateTime::currentDateTimeUtc().addSecs(19800)
         .toString(QStringLiteral("dd MMM yyyy 'IST'"))
         .toUpper();
-}
-
-void AirTrafficViewModel::selectTrack(int sourceIndex)
-{
-    if (m_filteredAirTaxis.proxyRowForSourceRow(sourceIndex) < 0)
-        setAirTaxiFilter(QString());
-    setSelectedTrack(sourceIndex);
 }
 
 void AirTrafficViewModel::selectFilteredTrack(int proxyIndex)
@@ -403,12 +406,13 @@ void AirTrafficViewModel::acknowledgeSeparationAlert()
     emit separationAlertActiveChanged();
 }
 
-void AirTrafficViewModel::advanceSurveillance()
+void AirTrafficViewModel::onSurveillanceUpdate()
 {
-    const bool alertWasActive = separationAlertActive();
     ++m_surveillanceTick;
-    m_airTaxis.advanceOneSecond(m_surveillanceTick);
-
+    if (!m_surveillanceInputValid) {
+        m_surveillanceInputValid = true;
+        emit operationalChanged();
+    }
     const QString alertCallSign = alertAirTaxi().value(QStringLiteral("callSign")).toString();
     if (alertCallSign.isEmpty()) {
         m_alertAcknowledged = false;
@@ -417,20 +421,24 @@ void AirTrafficViewModel::advanceSurveillance()
         m_alertAcknowledged = false;
         m_currentAlertCallSign = alertCallSign;
     }
-
-    emit surveillanceChanged();
-    if (alertWasActive != separationAlertActive())
-        emit separationAlertActiveChanged();
-}
-
-void AirTrafficViewModel::onSurveillanceUpdate()
-{
+    reconcileFilteredSelection();
     emit surveillanceChanged();
     emit selectedTrackChanged();
     emit airTaxiFilterChanged();
+    emit separationAlertActiveChanged();
+}
+
+void AirTrafficViewModel::onSurveillanceInputRejected()
+{
+    if (!m_surveillanceInputValid)
+        return;
+    m_surveillanceInputValid = false;
+    emit operationalChanged();
 }
 
 void AirTrafficViewModel::focusFilteredTrack(int proxyIndex)
 {
-    focusTrack(m_filteredAirTaxis.sourceRowForProxyRow(proxyIndex));
+    const int sourceRow = m_filteredAirTaxis.sourceRowForProxyRow(proxyIndex);
+    if (sourceRow >= 0)
+        focusTrack(sourceRow);
 }

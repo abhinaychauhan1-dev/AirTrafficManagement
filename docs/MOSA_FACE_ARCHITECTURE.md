@@ -12,7 +12,6 @@ QML views
         -> IStakeholderSimulation / IEventTransport
             <- StakeholderSimulationComponent
             <- MqttEventTransport (production)
-            <- InMemoryEventTransport (tests)
 
 main.cpp selects and connects concrete implementations.
 ```
@@ -26,7 +25,6 @@ Dependencies point toward versioned contracts and abstract interfaces. Portable 
 | `face/contracts` | Versioned shared data model used at component boundaries |
 | `face/interfaces` | Public Unit of Conformance and Transport Services contracts |
 | `face/components` | Portable Components Segment business behavior |
-| `face/transport` | Local Transport Services Segment implementation |
 | `adapters` | Platform-specific Qt presentation and timing adapter |
 | `main.cpp` | Composition root that selects replaceable implementations |
 | `presentation` | QML views only; no operational business rules |

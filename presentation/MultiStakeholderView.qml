@@ -675,8 +675,8 @@ Item {
                     }
                     RowLayout {
                         Layout.fillWidth: true
-                        ActionButton { text: "ASSIGN GATE"; enabled: root.viewModel.localControlsEnabled && root.viewModel.activeMissionVertiports.length > 0; onClicked: root.viewModel.assignGate(root.viewModel.activeMissionVertiports[root.selectedVertiport].sourceIndex) }
-                        ActionButton { text: "START CHARGING"; enabled: root.viewModel.localControlsEnabled && root.viewModel.activeMissionVertiports.length > 0; accent: root.cyan; onClicked: root.viewModel.startCharging(root.viewModel.activeMissionVertiports[root.selectedVertiport].sourceIndex) }
+                        ActionButton { text: "ASSIGN GATE"; enabled: root.viewModel.localControlsEnabled && root.selectedVertiport >= 0 && root.selectedVertiport < root.viewModel.activeMissionVertiports.length; onClicked: root.viewModel.assignGate(root.viewModel.activeMissionVertiports[root.selectedVertiport].sourceIndex) }
+                        ActionButton { text: "START CHARGING"; enabled: root.viewModel.localControlsEnabled && root.selectedVertiport >= 0 && root.selectedVertiport < root.viewModel.activeMissionVertiports.length; accent: root.cyan; onClicked: root.viewModel.startCharging(root.viewModel.activeMissionVertiports[root.selectedVertiport].sourceIndex) }
                         Item { Layout.fillWidth: true }
                         Text { text: root.viewModel.workflowNotes.vertiport; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
                     }
@@ -729,8 +729,8 @@ Item {
                     }
                     RowLayout {
                         Layout.fillWidth: true
-                        ActionButton { text: "GRANT SLOT"; enabled: root.viewModel.localControlsEnabled && root.viewModel.activeMissionSlots.length > 0; onClicked: root.viewModel.decideSlot(root.viewModel.activeMissionSlots[root.selectedSlot].sourceIndex, true) }
-                        ActionButton { text: "DENY SLOT"; enabled: root.viewModel.localControlsEnabled && root.viewModel.activeMissionSlots.length > 0; accent: root.red; onClicked: root.viewModel.decideSlot(root.viewModel.activeMissionSlots[root.selectedSlot].sourceIndex, false) }
+                        ActionButton { text: "GRANT SLOT"; enabled: root.viewModel.localControlsEnabled && root.selectedSlot >= 0 && root.selectedSlot < root.viewModel.activeMissionSlots.length; onClicked: root.viewModel.decideSlot(root.viewModel.activeMissionSlots[root.selectedSlot].sourceIndex, true) }
+                        ActionButton { text: "DENY SLOT"; enabled: root.viewModel.localControlsEnabled && root.selectedSlot >= 0 && root.selectedSlot < root.viewModel.activeMissionSlots.length; accent: root.red; onClicked: root.viewModel.decideSlot(root.viewModel.activeMissionSlots[root.selectedSlot].sourceIndex, false) }
                         Item { Layout.fillWidth: true }
                         Text { text: root.viewModel.workflowNotes.slot; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
                     }
@@ -782,8 +782,8 @@ Item {
                     }
                     RowLayout {
                         Layout.fillWidth: true
-                        ActionButton { text: "ENFORCE BOUNDARY"; enabled: root.viewModel.localControlsEnabled && root.viewModel.activeMissionComplianceZones.length > 0; accent: root.amber; onClicked: root.viewModel.setBoundaryEnforcement(root.viewModel.activeMissionComplianceZones[root.selectedZone].sourceIndex, true) }
-                        ActionButton { text: "MONITOR ONLY"; enabled: root.viewModel.localControlsEnabled && root.viewModel.activeMissionComplianceZones.length > 0; accent: root.cyan; onClicked: root.viewModel.setBoundaryEnforcement(root.viewModel.activeMissionComplianceZones[root.selectedZone].sourceIndex, false) }
+                        ActionButton { text: "ENFORCE BOUNDARY"; enabled: root.viewModel.localControlsEnabled && root.selectedZone >= 0 && root.selectedZone < root.viewModel.activeMissionComplianceZones.length; accent: root.amber; onClicked: root.viewModel.setBoundaryEnforcement(root.viewModel.activeMissionComplianceZones[root.selectedZone].sourceIndex, true) }
+                        ActionButton { text: "MONITOR ONLY"; enabled: root.viewModel.localControlsEnabled && root.selectedZone >= 0 && root.selectedZone < root.viewModel.activeMissionComplianceZones.length; accent: root.cyan; onClicked: root.viewModel.setBoundaryEnforcement(root.viewModel.activeMissionComplianceZones[root.selectedZone].sourceIndex, false) }
                         Item { Layout.fillWidth: true }
                         Text { text: root.viewModel.workflowNotes.compliance; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
                     }

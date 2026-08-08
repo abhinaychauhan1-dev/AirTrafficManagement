@@ -4,7 +4,9 @@
 
 #include "adapters/MqttEventTransport.h"
 #include "adapters/QtStakeholderSimulationAdapter.h"
+#include "adapters/QtSurveillanceAdapter.h"
 #include "face/components/StakeholderSimulationComponent.h"
+#include "face/components/SurveillanceComponent.h"
 #include "viewmodels/AppShellViewModel.h"
 #include "viewmodels/AirTrafficViewModel.h"
 
@@ -15,6 +17,8 @@ int main(int argc, char *argv[])
     QGuiApplication::setOrganizationName(QStringLiteral("ATM Systems"));
 
     AirTrafficViewModel viewModel;
+    atm::face::components::SurveillanceComponent surveillance;
+    QtSurveillanceAdapter surveillanceAdapter(surveillance, viewModel.airTaxiListModel(), viewModel);
     AppShellViewModel shellViewModel;
     MqttEventTransport eventTransport;
     atm::face::components::StakeholderSimulationComponent stakeholderSimulation(eventTransport);

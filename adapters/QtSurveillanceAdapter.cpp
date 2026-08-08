@@ -18,6 +18,9 @@ void QtSurveillanceAdapter::onTick()
 {
     m_surveillance.advance();
     const auto &state = m_surveillance.surveillanceState();
-    m_airTaxiListModel.updateFromState(state);
+    if (!m_airTaxiListModel.updateFromState(state)) {
+        m_airTrafficViewModel.onSurveillanceInputRejected();
+        return;
+    }
     m_airTrafficViewModel.onSurveillanceUpdate();
 }

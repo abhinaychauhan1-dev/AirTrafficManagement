@@ -15,6 +15,7 @@ Item {
     property int visibilityKm: 9
     property real pressure: 1007.8
     property int telemetryTick: 0
+    property string operationMessage: "PAD, ENERGY, FLOW AND WEATHER CONTROL"
 
     readonly property color panel: "#0c1716"
     readonly property color raised: "#12201e"
@@ -37,17 +38,98 @@ Item {
     function setSelectedPadStatus(status) {
         if (selectedPad < 0 || selectedPad >= padModel.count)
             return
+        const currentPad = padModel.get(selectedPad)
+        for (let index = turnaroundModel.count - 1; index >= 0; --index) {
+            if (turnaroundModel.get(index).pad === currentPad.pad)
+                turnaroundModel.remove(index)
+        }
         padModel.setProperty(selectedPad, "status", status)
         if (status === "AVAILABLE") {
             padModel.setProperty(selectedPad, "airTaxi", "--")
             padModel.setProperty(selectedPad, "detail", "READY FOR ASSIGNMENT")
+            operationMessage = "PAD " + currentPad.pad + " RELEASED AND AVAILABLE"
         } else if (status === "RESERVED") {
-            padModel.setProperty(selectedPad, "airTaxi", "NEXT")
-            padModel.setProperty(selectedPad, "detail", "ARRIVAL WINDOW +04 MIN")
+            const nextCallSign = arrivalModel.count > 0 ? arrivalModel.get(0).callSign : "NEXT"
+            padModel.setProperty(selectedPad, "airTaxi", nextCallSign)
+            padModel.setProperty(selectedPad, "detail", "ARRIVAL WINDOW / QUEUE 01")
+            operationMessage = "PAD " + currentPad.pad + " RESERVED FOR " + nextCallSign
         } else if (status === "MAINTENANCE") {
             padModel.setProperty(selectedPad, "airTaxi", "LOCKED")
             padModel.setProperty(selectedPad, "detail", "GROUND CREW INSPECTION")
+            operationMessage = "PAD " + currentPad.pad + " LOCKED FOR MAINTENANCE"
         }
+    }
+
+    function reindexQueue(model) {
+        for (let index = 0; index < model.count; ++index)
+            model.setProperty(index, "order", String(index + 1).padStart(2, "0"))
+    }
+
+    function availablePadIndex(preferredIndex) {
+        if (preferredIndex >= 0 && preferredIndex < padModel.count
+                && ["AVAILABLE", "RESERVED"].includes(padModel.get(preferredIndex).status))
+            return preferredIndex
+        for (let index = 0; index < padModel.count; ++index) {
+            if (padModel.get(index).status === "AVAILABLE")
+                return index
+        }
+        return -1
+    }
+
+    function advanceQueue() {
+        const model = queueMode === 0 ? arrivalModel : departureModel
+        if (model.count === 0) {
+            operationMessage = queueMode === 0 ? "NO ARRIVALS WAITING" : "NO DEPARTURES WAITING"
+            return
+        }
+
+        const flight = model.get(0)
+        if (queueMode === 0) {
+            const padIndex = availablePadIndex(selectedPad)
+            if (padIndex < 0) {
+                operationMessage = "ARRIVAL " + flight.callSign + " HELD / NO PAD AVAILABLE"
+                return
+            }
+            const padName = padModel.get(padIndex).pad
+            selectedPad = padIndex
+            padModel.setProperty(padIndex, "status", "OCCUPIED")
+            padModel.setProperty(padIndex, "airTaxi", flight.callSign)
+            padModel.setProperty(padIndex, "detail", "TURNAROUND / 18 MIN")
+            turnaroundModel.append({"callSign": flight.callSign, "pad": padName,
+                                    "task": "GROUND SERVICE", "progress": 0,
+                                    "battery": 48, "elapsed": 0, "target": 18,
+                                    "accent": "cyan"})
+            operationMessage = flight.callSign + " ARRIVED / PAD " + padName + " TURNAROUND STARTED"
+        } else {
+            let releasedPad = ""
+            for (let index = 0; index < padModel.count; ++index) {
+                if (padModel.get(index).airTaxi === flight.callSign) {
+                    releasedPad = padModel.get(index).pad
+                    selectedPad = index
+                    setSelectedPadStatus("AVAILABLE")
+                    break
+                }
+            }
+            operationMessage = flight.callSign + " RELEASED TO " + flight.route
+                    + (releasedPad.length ? " / PAD " + releasedPad + " AVAILABLE" : "")
+        }
+        model.remove(0)
+        reindexQueue(model)
+    }
+
+    function completeTurnaround(index) {
+        if (index < 0 || index >= turnaroundModel.count)
+            return
+        const service = turnaroundModel.get(index)
+        for (let padIndex = 0; padIndex < padModel.count; ++padIndex) {
+            if (padModel.get(padIndex).pad === service.pad
+                    && padModel.get(padIndex).airTaxi === service.callSign) {
+                padModel.setProperty(padIndex, "detail", "SERVICE COMPLETE / DEPARTURE READY")
+                break
+            }
+        }
+        turnaroundModel.remove(index)
+        operationMessage = service.callSign + " TURNAROUND COMPLETE / READY FOR DEPARTURE"
     }
 
     component PanelTitle: RowLayout {
@@ -164,13 +246,16 @@ Item {
             root.windDirection = (238 + root.telemetryTick * 2) % 360
             root.temperature = 29.6 + Math.sin(root.telemetryTick * 0.12) * 0.5
             root.pressure = 1007.8 + Math.sin(root.telemetryTick * 0.16) * 0.7
-            for (let index = 0; index < turnaroundModel.count; ++index) {
+            for (let index = turnaroundModel.count - 1; index >= 0; --index) {
                 const current = turnaroundModel.get(index)
                 if (current.progress < 100) {
-                    turnaroundModel.setProperty(index, "progress", Math.min(100, current.progress + 1))
+                    const nextProgress = Math.min(100, current.progress + 1)
+                    turnaroundModel.setProperty(index, "progress", nextProgress)
                     turnaroundModel.setProperty(index, "battery", Math.min(100, current.battery + (index === 0 ? 1 : 0)))
                     if (root.telemetryTick % 4 === 0)
                         turnaroundModel.setProperty(index, "elapsed", current.elapsed + 1)
+                    if (nextProgress === 100)
+                        root.completeTurnaround(index)
                 }
             }
         }
@@ -196,7 +281,7 @@ Item {
                     Layout.fillWidth: true
                     spacing: 3
                     Text { text: "HUB & GROUND OPERATIONS"; color: root.textMain; font.family: "Consolas"; font.pixelSize: 21; font.bold: true }
-                    Text { text: "VPT-IGI / DELHI PRIMARY HUB  |  PAD, ENERGY, FLOW AND WEATHER CONTROL"; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 11 }
+                    Text { width: parent.width; text: "VPT-IGI / DELHI PRIMARY HUB  |  " + root.operationMessage; color: root.textMuted; font.family: "Consolas"; font.pixelSize: 11; elide: Text.ElideRight }
                 }
                 StatusBadge { status: root.windGust < 18 ? "VTOL CONDITIONS NORMAL" : "WIND CAUTION"; accent: root.windGust < 18 ? root.green : root.amber }
                 Column {
@@ -277,9 +362,9 @@ Item {
                             spacing: 6
                             Text { text: "PAD " + padModel.get(root.selectedPad).pad; color: root.textMain; font.family: "Consolas"; font.pixelSize: 11; font.bold: true }
                             Item { Layout.fillWidth: true }
-                            OpsButton { text: "RESERVE"; accent: root.amber; onClicked: root.setSelectedPadStatus("RESERVED") }
-                            OpsButton { text: "MARK AVAILABLE"; onClicked: root.setSelectedPadStatus("AVAILABLE") }
-                            OpsButton { text: "MAINTENANCE"; accent: root.red; onClicked: root.setSelectedPadStatus("MAINTENANCE") }
+                            OpsButton { text: "RESERVE"; accent: root.amber; enabled: padModel.get(root.selectedPad).status !== "RESERVED"; onClicked: root.setSelectedPadStatus("RESERVED") }
+                            OpsButton { text: "MARK AVAILABLE"; enabled: padModel.get(root.selectedPad).status !== "AVAILABLE"; onClicked: root.setSelectedPadStatus("AVAILABLE") }
+                            OpsButton { text: "MAINTENANCE"; accent: root.red; enabled: padModel.get(root.selectedPad).status !== "MAINTENANCE"; onClicked: root.setSelectedPadStatus("MAINTENANCE") }
                         }
                     }
                 }
@@ -393,16 +478,8 @@ Item {
                             OpsButton {
                                 text: "ADVANCE QUEUE"
                                 accent: root.queueMode === 0 ? root.cyan : root.green
-                                onClicked: {
-                                    const model = root.queueMode === 0 ? arrivalModel : departureModel
-                                    if (model.count > 1) {
-                                        const first = model.get(0)
-                                        model.remove(0)
-                                        model.append(first)
-                                        for (let index = 0; index < model.count; ++index)
-                                            model.setProperty(index, "order", String(index + 1).padStart(2, "0"))
-                                    }
-                                }
+                                enabled: (root.queueMode === 0 ? arrivalModel.count : departureModel.count) > 0
+                                onClicked: root.advanceQueue()
                             }
                         }
                     }

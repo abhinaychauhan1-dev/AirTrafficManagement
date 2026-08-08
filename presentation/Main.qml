@@ -211,7 +211,7 @@ ApplicationWindow {
                             }
                             Item { Layout.fillWidth: true }
                             Text {
-                                text: "5 MODULES"
+                                text: appShellViewModel.modules.length + " MODULES"
                                 color: window.textMuted
                                 font.family: "Consolas"
                                 font.pixelSize: 11
@@ -568,8 +568,8 @@ ApplicationWindow {
                     Rectangle { width: 1; height: 24; color: window.line }
                     Row {
                         spacing: 7
-                        StatusDot { anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: airTrafficViewModel.dataStatusText; color: window.green; font.family: "Consolas"; font.pixelSize: 12; font.bold: true }
+                        StatusDot { anchors.verticalCenter: parent.verticalCenter; statusColor: airTrafficViewModel.operational ? window.green : window.amber }
+                        Text { text: airTrafficViewModel.dataStatusText; color: airTrafficViewModel.operational ? window.green : window.amber; font.family: "Consolas"; font.pixelSize: 12; font.bold: true }
                     }
                 }
             }
@@ -758,7 +758,7 @@ ApplicationWindow {
     MultiStakeholderView {
         anchors.fill: parent
         anchors.margins: 8
-        visible: appShellViewModel.selectedModuleIndex === 1
+        visible: appShellViewModel.selectedModuleIndex === 3
         viewModel: stakeholderSimulationViewModel
     }
 
@@ -769,24 +769,10 @@ ApplicationWindow {
         viewModel: stakeholderSimulationViewModel
     }
 
-    FeaturePlaceholder {
+    VehicleTelemetryView {
         anchors.fill: parent
         anchors.margins: 8
-        visible: appShellViewModel.selectedModuleIndex === 3
-        featureNumber: appShellViewModel.modules[3].featureNumber
-        title: appShellViewModel.modules[3].title
-        summary: appShellViewModel.modules[3].summary
-        capabilities: appShellViewModel.modules[3].capabilities
-    }
-
-    FeaturePlaceholder {
-        anchors.fill: parent
-        anchors.margins: 8
-        visible: appShellViewModel.selectedModuleIndex === 4
-        featureNumber: appShellViewModel.modules[4].featureNumber
-        title: appShellViewModel.modules[4].title
-        summary: appShellViewModel.modules[4].summary
-        capabilities: appShellViewModel.modules[4].capabilities
+        visible: appShellViewModel.selectedModuleIndex === 1
     }
 
     Shortcut {

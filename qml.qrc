@@ -7,6 +7,6 @@
         <file>presentation/InteractiveComboBox.qml</file>
         <file>presentation/MultiStakeholderView.qml</file>
         <file>presentation/HubGroundOperationsView.qml</file>
-        <file>presentation/FeaturePlaceholder.qml</file>
+        <file>presentation/VehicleTelemetryView.qml</file>
     </qresource>
 </RCC>

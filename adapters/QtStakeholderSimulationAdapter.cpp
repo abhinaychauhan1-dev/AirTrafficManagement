@@ -352,7 +352,8 @@ void QtStakeholderSimulationAdapter::assignGate(int index)
     const bool success = index >= 0 && m_simulation.assignGate(static_cast<std::size_t>(index), callSign);
     if (success)
         emitStateChanged();
-    reportAction(success ? QStringLiteral("Gate request processed.") : QStringLiteral("Select a vertiport."), success);
+    reportAction(success ? QStringLiteral("Gate request processed.")
+                         : QStringLiteral("Select an available vertiport; this mission may already have a gate."), success);
 }
 
 void QtStakeholderSimulationAdapter::startCharging(int index)
@@ -363,7 +364,8 @@ void QtStakeholderSimulationAdapter::startCharging(int index)
     const bool success = index >= 0 && m_simulation.startCharging(static_cast<std::size_t>(index), callSign);
     if (success)
         emitStateChanged();
-    reportAction(success ? QStringLiteral("Charging request processed.") : QStringLiteral("Select a vertiport."), success);
+    reportAction(success ? QStringLiteral("Charging request processed.")
+                         : QStringLiteral("Select an available charger; this mission may already be charging."), success);
 }
 
 void QtStakeholderSimulationAdapter::decideSlot(int index, bool granted)
@@ -373,7 +375,10 @@ void QtStakeholderSimulationAdapter::decideSlot(int index, bool granted)
     const bool success = index >= 0 && m_simulation.decideSlot(static_cast<std::size_t>(index), granted);
     if (success)
         emitStateChanged();
-    reportAction(success ? (granted ? QStringLiteral("Slot granted.") : QStringLiteral("Slot denied."))
+    const QVariantList updatedSlots = slotRequests();
+    const QString resultingStatus = success && index < updatedSlots.size()
+        ? updatedSlots.at(index).toMap().value(QStringLiteral("status")).toString() : QString();
+    reportAction(success ? QStringLiteral("Slot decision applied: %1.").arg(resultingStatus)
                          : QStringLiteral("Select a slot request."), success);
 }
 

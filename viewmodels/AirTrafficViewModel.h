@@ -33,7 +33,7 @@ class AirTrafficViewModel final : public QObject
     Q_PROPERTY(bool sweepEnabled READ sweepEnabled NOTIFY sweepEnabledChanged)
     Q_PROPERTY(bool weatherEnabled READ weatherEnabled NOTIFY weatherEnabledChanged)
     Q_PROPERTY(bool routesEnabled READ routesEnabled NOTIFY routesEnabledChanged)
-    Q_PROPERTY(bool operational READ operational CONSTANT)
+    Q_PROPERTY(bool operational READ operational NOTIFY operationalChanged)
     Q_PROPERTY(bool separationAlertActive READ separationAlertActive NOTIFY separationAlertActiveChanged)
     Q_PROPERTY(QVariantList operationalFacts READ operationalFacts NOTIFY surveillanceChanged)
     Q_PROPERTY(QVariantMap activeVertiport READ activeVertiport CONSTANT)
@@ -50,7 +50,7 @@ class AirTrafficViewModel final : public QObject
     Q_PROPERTY(QString updateRate READ updateRate CONSTANT)
     Q_PROPERTY(QString adsbCoverage READ adsbCoverage CONSTANT)
     Q_PROPERTY(QString controllerPosition READ controllerPosition CONSTANT)
-    Q_PROPERTY(QString dataStatusText READ dataStatusText CONSTANT)
+    Q_PROPERTY(QString dataStatusText READ dataStatusText NOTIFY operationalChanged)
     Q_PROPERTY(QString lastUpdateTime READ lastUpdateTime NOTIFY surveillanceChanged)
     Q_PROPERTY(qreal viewCenterX READ viewCenterX NOTIFY viewportChanged)
     Q_PROPERTY(qreal viewCenterY READ viewCenterY NOTIFY viewportChanged)
@@ -62,6 +62,7 @@ public:
 
     QAbstractItemModel *airTaxis();
     QAbstractItemModel *filteredAirTaxis();
+    AirTaxiListModel &airTaxiListModel();
     QString airTaxiFilter() const;
     Q_INVOKABLE void setAirTaxiFilter(const QString &filter);
     QString altitudeFilter() const;
@@ -113,20 +114,18 @@ public:
     QString istTime() const;
     QString istDate() const;
 
-    Q_INVOKABLE void selectTrack(int sourceIndex);
     Q_INVOKABLE void selectFilteredTrack(int proxyIndex);
     Q_INVOKABLE void focusFilteredTrack(int proxyIndex);
     Q_INVOKABLE void decreaseRange();
     Q_INVOKABLE void increaseRange();
     Q_INVOKABLE void changeRangeBySteps(int steps);
-    Q_INVOKABLE void focusTrack(int sourceIndex);
     Q_INVOKABLE void resetRadarView();
     Q_INVOKABLE void toggleSweep();
     Q_INVOKABLE void toggleWeather();
     Q_INVOKABLE void toggleRoutes();
     Q_INVOKABLE void acknowledgeSeparationAlert();
-    Q_INVOKABLE void advanceSurveillance();
     void onSurveillanceUpdate();
+    void onSurveillanceInputRejected();
 
 signals:
     void selectedTrackChanged();
@@ -139,8 +138,11 @@ signals:
     void clockChanged();
     void surveillanceChanged();
     void viewportChanged();
+    void operationalChanged();
 
 private:
+    void focusTrack(int sourceIndex);
+    void reconcileFilteredSelection();
     void setSelectedTrack(int selectedTrack);
     void setRangeNm(int rangeNm);
     void setSweepEnabled(bool enabled);
@@ -150,7 +152,6 @@ private:
     AirTaxiListModel m_airTaxis;
     AirTaxiFilterProxyModel m_filteredAirTaxis;
     QTimer m_clockTimer;
-    QTimer m_surveillanceTimer;
     QString m_airTaxiFilter;
     QString m_altitudeFilter;
     QString m_phaseFilter;
@@ -165,4 +166,5 @@ private:
     bool m_weatherEnabled = true;
     bool m_routesEnabled = true;
     bool m_alertAcknowledged = false;
+    bool m_surveillanceInputValid = true;
 };

@@ -21,6 +21,12 @@ A desktop-based Air Taxi Traffic Management and simulation application built usi
 
 ---
 
+## Software Assurance
+
+The project applies selected DO-178C-aligned principles for deterministic behavior, defensive boundary validation, requirements traceability, and verification readiness. It is not certified airborne software and does not claim certification credit. See [docs/DO178C_ASSURANCE_PLAN.md](docs/DO178C_ASSURANCE_PLAN.md) for scope, traced requirements, current evidence, and remaining certification work.
+
+---
+
 ## Project Structure
 ```text
 AirTaxiTrafficManagement/

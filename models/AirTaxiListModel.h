@@ -39,8 +39,7 @@ public:
     QVariantMap airTaxiAt(int row) const;
     QVariantMap alertAirTaxi() const;
     int alertCount() const;
-    bool advanceOneSecond(int tick);
-    void updateFromState(const atm::face::contracts::v1::SurveillanceState &state);
+    bool updateFromState(const atm::face::contracts::v1::SurveillanceState &state);
 
 private:
     struct AirTaxi {
